@@ -23,8 +23,8 @@ impl PortariumService {
         }
     }
 
-    pub fn scan_and_log(&mut self) -> Vec<PortEvent> {
-        let ports = self.scanner.scan();
+    pub fn scan_and_log(&mut self) -> Result<Vec<PortEvent>> {
+        let ports = self.scanner.scan()?;
 
         let port_tuples: Vec<(u16, u32, String, Option<String>)> = ports
             .iter()
@@ -52,10 +52,10 @@ impl PortariumService {
             conn_counts.insert(node.port, node.connection_count);
         }
 
-        self.logger.update(&port_tuples, &conn_counts)
+        Ok(self.logger.update(&port_tuples, &conn_counts))
     }
 
-    pub fn get_ports(&mut self) -> Vec<PortInfo> {
+    pub fn get_ports(&mut self) -> Result<Vec<PortInfo>> {
         self.scanner.scan()
     }
 
@@ -71,8 +71,8 @@ impl PortariumService {
         self.logger.get_all_traffic()
     }
 
-    pub fn get_graph(&mut self) -> PortGraph {
-        let ports = self.scanner.scan();
+    pub fn get_graph(&mut self) -> Result<PortGraph> {
+        let ports = self.scanner.scan()?;
         let listening: Vec<(u16, u32, String, Option<String>)> = ports
             .iter()
             .map(|p| {
@@ -84,7 +84,7 @@ impl PortariumService {
                 )
             })
             .collect();
-        graph::build_port_graph(&listening)
+        Ok(graph::build_port_graph(&listening))
     }
 
     pub fn kill(&self, pid: u32) -> Result<()> {

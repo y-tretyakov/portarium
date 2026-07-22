@@ -8,6 +8,9 @@ pub mod scanner;
 pub mod service;
 
 pub use config::PortariumConfig;
-pub use error::{Error, Result};
-pub use models::*;
+pub use error::Error;
+pub use models::{
+    EventType, Framework, GraphEdge, GraphNode, PortEvent, PortGraph, PortInfo, Protocol,
+    TrafficSample,
+};
 pub use service::PortariumService;

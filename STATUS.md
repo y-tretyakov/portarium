@@ -2,45 +2,44 @@
 
 **Последнее обновление:** 22 июля 2026
 
-## Текущая архитектура (до рефакторинга)
-
-```
-portarium/
-├── src/                   # React + Vite фронтенд (Tauri Desktop)
-├── src-tauri/src/         # Rust бэкенд (scanner, logger, connections, tray)
-├── src-tui/               # TUI на OpenTUI (Bun + React) — дублирует scanner.ts
-├── bin/cli.tsx            # CLI точка входа для Bun
-└── docs/                  # Документация
-```
-
-## Проблемы
-- Дублирование scanner.rs ↔ scanner.ts (разная реализация одной логики)
-- Дублирование frameworks.ts (вручную поддерживать два списка)
-- OpenTUI зависит от Bun — лишняя external dependency
-- Нет тестов
-- Нет обработки ошибок (unwrap/expect)
-
 ## Целевая архитектура (WIP)
 
 ```
 portarium/
 ├── core/                  # Rust library — вся бизнес-логика [✅ готово]
-│   ├── src/
-│   │   ├── lib.rs         # Публичное API (pub use всех типов)
-│   │   ├── config.rs      # ScannerConfig, LoggerConfig, PortariumConfig
-│   │   ├── error.rs       # Error enum (thiserror) + Result
-│   │   ├── models.rs      # PortInfo, PortEvent, GraphNode, Framework...
-│   │   ├── scanner/       # PortScanner — lsof/ss/netstat, kill, restart
-│   │   ├── logger/        # PortLogger — события + трафик
-│   │   ├── graph/         # PortGraph — построение графа соединений
-│   │   ├── frameworks/    # Registry: Vite, React, Postgres...
-│   │   └── service.rs     # PortariumService — главный фасад
-│   └── Cargo.toml
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs         # Публичное API (явный экспорт)
+│       ├── config.rs      # ScannerConfig, LoggerConfig, PortariumConfig
+│       ├── error.rs       # Error enum (thiserror)
+│       ├── models.rs      # PortInfo, PortEvent, GraphNode, Framework...
+│       ├── scanner/       # PortScanner + ScannerBackend trait + impl'ы
+│       ├── logger/        # PortLogger — события + трафик
+│       ├── graph/         # PortGraph — построение графа соединений
+│       ├── frameworks/    # FrameworkRegistry: TOML-расширяемый + builtin
+│       └── service.rs     # PortariumService — главный фасад (Result-based)
 ├── tui/                   # Ratatui TUI [в разработке]
 ├── src-tauri/             # Tauri Desktop (использует core) [ожидает]
 ├── cli/                   # CLI [ожидает]
-└── Cargo.toml             # workspace [готово]
+└── Cargo.toml             # workspace
 ```
+
+## Что сделано
+
+### core — production-ready
+- `ScannerBackend` trait + `UnixScanner` / `WindowsScanner` impl'ы
+- Отсутствие `eprintln!` в lib-коде (все ошибки через `Result`)
+- `FrameworkRegistry` с TOML-расширяемостью + builtin-списком
+- Чистый pub API (явные экспорты, без wildcard)
+- Workspace dependencies для chrono, sysinfo, libc, once_cell, toml
+- 37 unit-тестов (включая proptest для frameworks)
+- Clippy-clean (0 warnings)
+
+### src-tauri — интегрирован с core
+- scanner.rs, logger.rs, connections.rs — удалены (были дубликатами core)
+- Использует `portarium_core::PortariumService` через `tauri::State<AppState>`
+- `tray.rs` использует `core::frameworks::is_dev_port()` вместо inline-списка
+- `AppState` — `Arc<Mutex<PortariumService>>`, проброшен в tray thread
 
 ## Этапы
 
@@ -48,7 +47,7 @@ portarium/
 |------|--------|
 | 0 — Инфраструктура | ✅ |
 | 1 — portarium-core | ✅ |
+| 3 — Tauri Desktop → core | ✅ |
 | 2 — portarium-tui (Ratatui) | ⬜ |
-| 3 — Tauri Desktop → core | ⬜ |
 | 4 — CLI | ⬜ |
 | 5 — Тесты и CI | ⬜ |

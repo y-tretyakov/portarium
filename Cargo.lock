@@ -2745,15 +2745,12 @@ dependencies = [
 
 [[package]]
 name = "portarium"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
- "lazy_static",
- "libc",
- "once_cell",
+ "portarium-core",
  "regex",
  "serde",
  "serde_json",
- "sysinfo",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
@@ -2763,7 +2760,7 @@ dependencies = [
 
 [[package]]
 name = "portarium-cli"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "color-eyre",
  "portarium-core",
@@ -2774,21 +2771,23 @@ dependencies = [
 
 [[package]]
 name = "portarium-core"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "chrono",
  "libc",
+ "once_cell",
  "proptest",
  "serde",
  "serde_json",
  "sysinfo",
  "tempfile",
  "thiserror 2.0.19",
+ "toml 0.8.2",
 ]
 
 [[package]]
 name = "portarium-tui"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "color-eyre",
  "portarium-core",

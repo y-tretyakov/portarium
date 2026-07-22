@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.4.0] — 2026-07-22 — Архитектурная реструктуризация
+## [0.5.0] — 2026-07-22 — Core hardening + Tauri integration
 
 ### Added (Этап 0)
 - Cargo workspace в корне проекта (core + tui + src-tauri + cli)
@@ -18,6 +18,21 @@
 - **`core/src/scanner/mod.rs`** — PortScanner (lsof/ss/netstat), kill/restart, find_project_root, extract_project_name
 - **`core/src/logger/mod.rs`** — PortLogger: трекинг событий (started/stopped/conflict), трафик, first_seen
 - **`core/src/graph/mod.rs`** — build_port_graph + get_active_connections (platform-specific)
+
+### Changed (core — quality pass)
+- **Scanner**: Выделен `ScannerBackend` trait + `UnixScanner`/`WindowsScanner` impl'ы
+- **Scanner**: Убраны `eprintln!` — все ошибки возвращаются через `Result`
+- **Frameworks**: Разбит на `builtin.rs` + `registry.rs`. Добавлен `FrameworkRegistry` с TOML-расширяемостью
+- **lib.rs**: Явный экспорт моделей вместо `pub use models::*`, убран `pub use error::Result`
+- **Deps**: chrono, once_cell, toml, sysinfo, libc вынесены в `[workspace.dependencies]`
+
+### Changed (Этап 3 — Tauri Desktop → core)
+- **src-tauri**: Удалены файлы-дубликаты `scanner.rs`, `logger.rs`, `connections.rs` (~790 строк)
+- **src-tauri**: Подключён `portarium-core` как единственный бэкенд
+- **src-tauri/lib.rs**: `AppState` с `Arc<Mutex<PortariumService>>`, 6 Tauri команд — тонкие обёртки над core
+- **src-tauri/tray.rs**: Использует `core::frameworks::is_dev_port()`, получает service через `Arc<Mutex<...>>`
+- **src-tauri/Cargo.toml**: Убраны sysinfo, libc, lazy_static (они в core)
+- **core/scanner**: Добавлен `Send` bound на `trait ScannerBackend` (нужен для Arc<Mutex<...>>)
 - **`core/src/frameworks/mod.rs`** — FrameworkRegistry: detection dev-портов (Vite, React, etc.)
 - **`core/src/service.rs`** — PortariumService facade (scan → log → graph)
 - **`core/src/lib.rs`** — Публичное API через `pub use`

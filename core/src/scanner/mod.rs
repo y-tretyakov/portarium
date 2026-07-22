@@ -6,65 +6,22 @@ use sysinfo::System;
 use crate::error::Result;
 use crate::models::PortInfo;
 
-pub struct PortScanner {
-    sys: System,
+pub(crate) trait ScannerBackend: Send {
+    fn scan(&mut self, sys: &mut System) -> Result<Vec<PortInfo>>;
+    fn kill(pid: u32) -> Result<()>
+    where
+        Self: Sized;
 }
 
-impl PortScanner {
-    pub fn new() -> Self {
-        Self { sys: System::new() }
-    }
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+pub(crate) struct UnixScanner;
 
-    pub fn scan(&mut self) -> Vec<PortInfo> {
-        self.sys.refresh_processes();
-
-        #[cfg(target_os = "windows")]
-        return self.scan_windows();
-
-        #[cfg(any(target_os = "macos", target_os = "linux"))]
-        return self.scan_unix();
-    }
-
-    pub fn kill(&self, pid: u32) -> Result<()> {
-        #[cfg(target_os = "windows")]
-        return kill_windows(pid);
-
-        #[cfg(any(target_os = "macos", target_os = "linux"))]
-        return kill_unix(pid);
-    }
-
-    pub fn restart(&self, pid: u32, cmd: &str, cwd: &str) -> Result<()> {
-        self.kill(pid)?;
-
-        std::thread::sleep(std::time::Duration::from_millis(800));
-
-        let mut parts = cmd.split_whitespace();
-        let program = parts
-            .next()
-            .ok_or_else(|| crate::error::Error::Process("empty command".into()))?;
-        let args: Vec<&str> = parts.collect();
-
-        Command::new(program)
-            .args(&args)
-            .current_dir(cwd)
-            .spawn()
-            .map_err(|e| crate::error::Error::Process(e.to_string()))?;
-
-        Ok(())
-    }
-
-    #[cfg(any(target_os = "macos", target_os = "linux"))]
-    fn scan_unix(&mut self) -> Vec<PortInfo> {
-        let output = match Command::new("lsof")
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+impl ScannerBackend for UnixScanner {
+    fn scan(&mut self, sys: &mut System) -> Result<Vec<PortInfo>> {
+        let output = Command::new("lsof")
             .args(["-iTCP", "-sTCP:LISTEN", "-n", "-P"])
-            .output()
-        {
-            Ok(o) => o,
-            Err(e) => {
-                eprintln!("lsof failed: {e}");
-                return Vec::new();
-            }
-        };
+            .output()?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         let mut ports: Vec<PortInfo> = Vec::new();
@@ -96,7 +53,7 @@ impl PortScanner {
             let mut project_path = None;
             let mut start_cmd = None;
 
-            if let Some(process) = self.sys.process(sysinfo::Pid::from(pid as usize)) {
+            if let Some(process) = sys.process(sysinfo::Pid::from(pid as usize)) {
                 let sys_name = process.name().to_string();
                 if !sys_name.is_empty() {
                     process_name = sys_name;
@@ -130,18 +87,36 @@ impl PortScanner {
         }
 
         ports.sort_by_key(|p| p.port);
-        ports
+        Ok(ports)
     }
 
-    #[cfg(target_os = "windows")]
-    fn scan_windows(&mut self) -> Vec<PortInfo> {
-        let output = match Command::new("netstat").args(["-ano"]).output() {
-            Ok(o) => o,
-            Err(e) => {
-                eprintln!("netstat failed: {e}");
-                return Vec::new();
+    fn kill(pid: u32) -> Result<()> {
+        unsafe {
+            libc::kill(pid as i32, libc::SIGTERM);
+        }
+        std::thread::sleep(std::time::Duration::from_secs(2));
+
+        if process_exists_unix(pid) {
+            unsafe {
+                libc::kill(pid as i32, libc::SIGKILL);
             }
-        };
+        }
+        Ok(())
+    }
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+fn process_exists_unix(pid: u32) -> bool {
+    unsafe { libc::kill(pid as i32, 0) == 0 }
+}
+
+#[cfg(target_os = "windows")]
+pub(crate) struct WindowsScanner;
+
+#[cfg(target_os = "windows")]
+impl ScannerBackend for WindowsScanner {
+    fn scan(&mut self, sys: &mut System) -> Result<Vec<PortInfo>> {
+        let output = Command::new("netstat").args(["-ano"]).output()?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         let mut ports: Vec<PortInfo> = Vec::new();
@@ -175,7 +150,7 @@ impl PortScanner {
             let mut project_path = None;
             let mut start_cmd = None;
 
-            if let Some(process) = self.sys.process(sysinfo::Pid::from(pid as usize)) {
+            if let Some(process) = sys.process(sysinfo::Pid::from(pid as usize)) {
                 let p_name = process.name().to_string();
                 if !p_name.trim().is_empty() {
                     process_name = p_name;
@@ -214,7 +189,70 @@ impl PortScanner {
         }
 
         ports.sort_by_key(|p| p.port);
-        ports
+        Ok(ports)
+    }
+
+    fn kill(pid: u32) -> Result<()> {
+        let output = Command::new("taskkill")
+            .args(["/PID", &pid.to_string(), "/F"])
+            .output()
+            .map_err(|e| crate::error::Error::Process(e.to_string()))?;
+
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(crate::error::Error::Process(
+                String::from_utf8_lossy(&output.stderr).to_string(),
+            ))
+        }
+    }
+}
+
+pub struct PortScanner {
+    sys: System,
+    backend: Box<dyn ScannerBackend>,
+}
+
+impl PortScanner {
+    pub fn new() -> Self {
+        let sys = System::new();
+        #[cfg(target_os = "windows")]
+        let backend = Box::new(WindowsScanner);
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        let backend = Box::new(UnixScanner);
+        Self { sys, backend }
+    }
+
+    pub fn scan(&mut self) -> Result<Vec<PortInfo>> {
+        self.sys.refresh_processes();
+        self.backend.scan(&mut self.sys)
+    }
+
+    pub fn kill(&self, pid: u32) -> Result<()> {
+        #[cfg(target_os = "windows")]
+        return WindowsScanner::kill(pid);
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        return UnixScanner::kill(pid);
+    }
+
+    pub fn restart(&self, pid: u32, cmd: &str, cwd: &str) -> Result<()> {
+        self.kill(pid)?;
+
+        std::thread::sleep(std::time::Duration::from_millis(800));
+
+        let mut parts = cmd.split_whitespace();
+        let program = parts
+            .next()
+            .ok_or_else(|| crate::error::Error::Process("empty command".into()))?;
+        let args: Vec<&str> = parts.collect();
+
+        Command::new(program)
+            .args(&args)
+            .current_dir(cwd)
+            .spawn()
+            .map_err(|e| crate::error::Error::Process(e.to_string()))?;
+
+        Ok(())
     }
 }
 
@@ -246,42 +284,6 @@ fn get_project_path_unix_fallback(pid: u32) -> Option<String> {
             .map(|l| l[1..].to_string())?;
 
         find_project_root(std::path::Path::new(&cwd)).map(|p| p.to_string_lossy().to_string())
-    }
-}
-
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-fn kill_unix(pid: u32) -> Result<()> {
-    unsafe {
-        libc::kill(pid as i32, libc::SIGTERM);
-    }
-    std::thread::sleep(std::time::Duration::from_secs(2));
-
-    if process_exists_unix(pid) {
-        unsafe {
-            libc::kill(pid as i32, libc::SIGKILL);
-        }
-    }
-    Ok(())
-}
-
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-fn process_exists_unix(pid: u32) -> bool {
-    unsafe { libc::kill(pid as i32, 0) == 0 }
-}
-
-#[cfg(target_os = "windows")]
-fn kill_windows(pid: u32) -> Result<()> {
-    let output = Command::new("taskkill")
-        .args(["/PID", &pid.to_string(), "/F"])
-        .output()
-        .map_err(|e| crate::error::Error::Process(e.to_string()))?;
-
-    if output.status.success() {
-        Ok(())
-    } else {
-        Err(crate::error::Error::Process(
-            String::from_utf8_lossy(&output.stderr).to_string(),
-        ))
     }
 }
 
