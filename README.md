@@ -13,11 +13,28 @@ A blazing-fast, native developer port manager. Stop playing detective with `nets
 [![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/y-tretyakov/portarium/releases)
 [![Built with Tauri](https://img.shields.io/badge/Desktop-Tauri_2-FFC131?style=for-the-badge&logo=tauri&logoColor=white)](https://tauri.app)
 [![Terminal UI](https://img.shields.io/badge/Terminal-OpenTUI-7c6fff?style=for-the-badge)](https://github.com/anomalyco/opentui)
+[![npm](https://img.shields.io/npm/v/portarium?style=for-the-badge&logo=npm&label=npm)](https://www.npmjs.com/package/portarium)
 [![Stars](https://img.shields.io/github/stars/y-tretyakov/portarium?style=social)](https://github.com/y-tretyakov/portarium)
 
 ![Portarium App Interaction Demo](https://raw.githubusercontent.com/y-tretyakov/portarium/main/assets/gif.gif)
 
 </div>
+
+---
+
+## 🚀 Quick Start
+
+### Terminal UI (one-liner)
+
+```bash
+npx portarium
+```
+
+Requires [Bun](https://bun.sh). Install it once: `curl -fsSL https://bun.sh/install | bash`
+
+### Desktop App
+
+Download from [GitHub Releases](https://github.com/y-tretyakov/portarium/releases).
 
 ---
 
@@ -97,7 +114,20 @@ Portarium ships with a full keyboard-driven terminal interface built on [OpenTUI
 
 ## 📥 Installation
 
-### Download
+### Via npm (terminal-only)
+
+```bash
+# Run directly without installing
+npx portarium
+
+# Install globally
+npm install -g portarium
+portarium
+```
+
+> The npm package provides the terminal UI only. Requires [Bun](https://bun.sh).
+
+### Desktop App
 
 <table>
 <tr>
@@ -144,6 +174,17 @@ npm run tauri dev
 > The app launches with Vite HMR — edit React components and see changes instantly alongside the Rust backend watcher.
 
 #### Terminal UI
+
+```bash
+# Quick start (requires Bun)
+npx portarium
+
+# Install globally
+npm install -g portarium
+portarium
+```
+
+Or from source:
 
 ```bash
 # Requires Bun (https://bun.sh)

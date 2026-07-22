@@ -1,8 +1,11 @@
 {
   "name": "portarium",
-  "private": true,
-  "version": "0.3.0",
+  "version": "0.3.2",
   "type": "module",
+  "description": "Real-time port dashboard for your terminal — watch, search, kill & restart processes",
+  "bin": {
+    "portarium": "bin/cli.tsx"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
@@ -11,6 +14,12 @@
     "tui": "bun run src-tui/index.tsx",
     "tui:dev": "bun --watch run src-tui/index.tsx"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/y-tretyakov/portarium.git"
+  },
+  "keywords": ["port", "dashboard", "terminal", "tui", "developer-tools", "process-manager"],
+  "license": "MIT",
   "dependencies": {
     "@opentui/core": "^0.4.5",
     "@opentui/react": "^0.4.5",
@@ -21,7 +30,8 @@
     "howler": "^2.2.4",
     "html2canvas": "^1.4.1",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "tsx": "^4.19.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
