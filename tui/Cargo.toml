@@ -1,0 +1,11 @@
+[package]
+name = "portarium-tui"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+portarium-core = { path = "../core" }
+color-eyre.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true

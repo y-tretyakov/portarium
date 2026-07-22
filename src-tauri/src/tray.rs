@@ -1,10 +1,10 @@
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
-use tauri::{AppHandle, Manager, Emitter};
-use tauri::tray::{TrayIconBuilder, TrayIconEvent, MouseButton, MouseButtonState};
-use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem};
 use crate::scanner::{self, PortInfo};
 use serde::Serialize;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{AppHandle, Emitter, Manager};
 
 #[derive(Clone, PartialEq, Debug, Serialize)]
 pub enum TrafficState {
@@ -31,8 +31,7 @@ impl DebounceState {
 
 fn compute_state(ports: &[PortInfo]) -> TrafficState {
     let dev_ports = [
-        3000u16, 3001, 4000, 4200, 5173, 5174,
-        8000, 8080, 8888, 5432, 3306, 6379, 27017, 1420,
+        3000u16, 3001, 4000, 4200, 5173, 5174, 8000, 8080, 8888, 5432, 3306, 6379, 27017, 1420,
     ];
 
     // Check for conflict: same port bound twice
@@ -53,23 +52,29 @@ fn compute_state(ports: &[PortInfo]) -> TrafficState {
 
 fn get_icon_bytes(state: &TrafficState) -> &'static [u8] {
     match state {
-        TrafficState::Clear    => include_bytes!("../icons/tray-green.png"),
-        TrafficState::Active   => include_bytes!("../icons/tray-yellow.png"),
+        TrafficState::Clear => include_bytes!("../icons/tray-green.png"),
+        TrafficState::Active => include_bytes!("../icons/tray-yellow.png"),
         TrafficState::Conflict => include_bytes!("../icons/tray-red.png"),
     }
 }
 
 fn get_tooltip(state: &TrafficState, port_count: usize) -> String {
     match state {
-        TrafficState::Clear    => "Portarium — All clear".into(),
-        TrafficState::Active   => format!("Portarium — {} dev port{} active", port_count, if port_count == 1 { "" } else { "s" }),
+        TrafficState::Clear => "Portarium — All clear".into(),
+        TrafficState::Active => format!(
+            "Portarium — {} dev port{} active",
+            port_count,
+            if port_count == 1 { "" } else { "s" }
+        ),
         TrafficState::Conflict => "Portarium — ⚠ Port conflict detected!".into(),
     }
 }
 
 pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     // Build right-click menu
-    let open = MenuItemBuilder::new("Open Portarium").id("open").build(app)?;
+    let open = MenuItemBuilder::new("Open Portarium")
+        .id("open")
+        .build(app)?;
     let separator = PredefinedMenuItem::separator(app)?;
     let quit = MenuItemBuilder::new("Quit").id("quit").build(app)?;
 
@@ -81,9 +86,9 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
 
     // Build initial tray with green icon
     let _tray = TrayIconBuilder::new()
-        .icon(tauri::image::Image::from_bytes(
-            include_bytes!("../icons/tray-green.png")
-        )?)
+        .icon(tauri::image::Image::from_bytes(include_bytes!(
+            "../icons/tray-green.png"
+        ))?)
         .tooltip("Portarium — Starting…")
         .menu(&menu)
         .on_menu_event(|app, event| match event.id.as_ref() {
@@ -97,7 +102,8 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,
                 ..
-            } = event {
+            } = event
+            {
                 show_window(tray.app_handle());
             }
         })
@@ -114,15 +120,21 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
 
             let ports = scanner::scan_ports();
             let new_state = compute_state(&ports);
-            let port_count = ports.iter()
-                .filter(|p| [3000u16,3001,4000,4200,5173,5174,
-                              8000,8080,5432,3306,6379,27017,1420]
-                    .contains(&p.port))
+            let port_count = ports
+                .iter()
+                .filter(|p| {
+                    [
+                        3000u16, 3001, 4000, 4200, 5173, 5174, 8000, 8080, 5432, 3306, 6379, 27017,
+                        1420,
+                    ]
+                    .contains(&p.port)
+                })
                 .count();
 
             // Update the logger with current ports and connection counts
             {
-                let port_tuples: Vec<(u16, u32, String, Option<String>)> = ports.iter()
+                let port_tuples: Vec<(u16, u32, String, Option<String>)> = ports
+                    .iter()
                     .map(|p| {
                         let fw = crate::connections::get_framework_name(p.port);
                         (p.port, p.pid, p.process_name.clone(), fw)
@@ -130,8 +142,16 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
                     .collect();
 
                 // Get connection counts from the graph
-                let listening: Vec<(u16, u32, String, Option<String>)> = ports.iter()
-                    .map(|p| (p.port, p.pid, p.process_name.clone(), p.project_name.clone()))
+                let listening: Vec<(u16, u32, String, Option<String>)> = ports
+                    .iter()
+                    .map(|p| {
+                        (
+                            p.port,
+                            p.pid,
+                            p.process_name.clone(),
+                            p.project_name.clone(),
+                        )
+                    })
                     .collect();
                 let graph = crate::connections::get_port_graph(&listening);
                 let mut conn_counts = std::collections::HashMap::new();
@@ -156,9 +176,7 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
                     db.pending = new_state.clone();
                     db.since = Instant::now();
                     false
-                } else if db.current != new_state
-                    && db.since.elapsed() >= Duration::from_secs(4)
-                {
+                } else if db.current != new_state && db.since.elapsed() >= Duration::from_secs(4) {
                     // Stable for 4s and different from current — update
                     db.current = new_state.clone();
                     true

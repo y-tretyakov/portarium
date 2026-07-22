@@ -22,3 +22,20 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Rust build output
+target/
+
+# Temporary error dumps
+src-tauri/err*.txt
+src-tauri/errors.json
+
+# Old OpenTUI app (will be removed after Stage 2)
+portarium-tui
+
+# Agent files (except CHANGELOG)
+.agents/
+AGENTS.md
+skills-lock.json
+docs/portarium-analysis.md
+docs/PROMPT.md

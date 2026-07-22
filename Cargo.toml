@@ -1,0 +1,20 @@
+[workspace]
+resolver = "2"
+members = [
+    "core",
+    "tui",
+    "cli",
+    "src-tauri",
+]
+
+[workspace.package]
+version = "0.4.0"
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+color-eyre = "0.6"
+tokio = { version = "1", features = ["full"] }

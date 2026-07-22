@@ -29,12 +29,17 @@ struct PortTraffic {
 
 impl PortTraffic {
     fn new() -> Self {
-        Self { samples: Vec::new() }
+        Self {
+            samples: Vec::new(),
+        }
     }
 
     fn push(&mut self, conns: usize) {
         let ts = now_millis();
-        self.samples.push(TrafficSample { connections: conns, timestamp: ts });
+        self.samples.push(TrafficSample {
+            connections: conns,
+            timestamp: ts,
+        });
         // Keep last 30 samples (~60 seconds at 2s interval)
         if self.samples.len() > 30 {
             self.samples.remove(0);
@@ -110,13 +115,17 @@ impl PortLogger {
         }
 
         // Update traffic samples
-        for (port, _) in &current {
+        for port in current.keys() {
             let conns = conn_counts.get(port).copied().unwrap_or(0);
-            self.traffic.entry(*port).or_insert_with(PortTraffic::new).push(conns);
+            self.traffic
+                .entry(*port)
+                .or_insert_with(PortTraffic::new)
+                .push(conns);
         }
 
         // Update prev_ports
-        self.prev_ports = current.iter()
+        self.prev_ports = current
+            .iter()
             .map(|(port, (pid, name, _))| (*port, (*pid, name.clone())))
             .collect();
 
@@ -135,18 +144,22 @@ impl PortLogger {
         events
     }
 
+    #[expect(dead_code)]
     pub fn get_traffic(&self, port: u16) -> Vec<TrafficSample> {
-        self.traffic.get(&port)
+        self.traffic
+            .get(&port)
             .map(|t| t.samples.clone())
             .unwrap_or_default()
     }
 
     pub fn get_all_traffic(&self) -> HashMap<u16, Vec<TrafficSample>> {
-        self.traffic.iter()
+        self.traffic
+            .iter()
             .map(|(port, t)| (*port, t.samples.clone()))
             .collect()
     }
 
+    #[expect(dead_code)]
     pub fn get_first_seen(&self, port: u16) -> Option<u64> {
         self.first_seen.get(&port).copied()
     }

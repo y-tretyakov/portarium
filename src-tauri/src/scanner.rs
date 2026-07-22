@@ -1,6 +1,6 @@
 use serde::Serialize;
-use std::process::Command;
 use std::collections::HashSet;
+use std::process::Command;
 use sysinfo::System;
 
 #[derive(Serialize, Clone)]
@@ -49,12 +49,15 @@ fn scan_windows(sys: &System) -> Vec<PortInfo> {
     let mut seen_entries: HashSet<(u16, u32)> = HashSet::new();
 
     for line in stdout.lines() {
-        if !line.contains("LISTENING") { continue; }
+        if !line.contains("LISTENING") {
+            continue;
+        }
         let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.len() < 5 { continue; }
+        if parts.len() < 5 {
+            continue;
+        }
 
-        let port: u16 = match parts[1].rsplit(':').next()
-            .and_then(|p| p.parse().ok()) {
+        let port: u16 = match parts[1].rsplit(':').next().and_then(|p| p.parse().ok()) {
             Some(p) => p,
             None => continue,
         };
@@ -64,7 +67,9 @@ fn scan_windows(sys: &System) -> Vec<PortInfo> {
             Err(_) => continue,
         };
 
-        if pid == 0 || seen_entries.contains(&(port, pid)) { continue; }
+        if pid == 0 || seen_entries.contains(&(port, pid)) {
+            continue;
+        }
         seen_entries.insert((port, pid));
 
         let mut process_name = format!("PID {}", pid);
@@ -76,10 +81,10 @@ fn scan_windows(sys: &System) -> Vec<PortInfo> {
             if !p_name.trim().is_empty() {
                 process_name = p_name;
             }
-            
+
             let cmd_arr = process.cmd();
             let cmd_str = cmd_arr.join(" ");
-            
+
             if !cmd_str.trim().is_empty() {
                 start_cmd = Some(cmd_str.trim().to_string());
             }
@@ -87,11 +92,12 @@ fn scan_windows(sys: &System) -> Vec<PortInfo> {
             if let Some(cwd) = process.cwd() {
                 project_path = find_project_root(cwd).map(|p| p.to_string_lossy().to_string());
             }
-            
+
             if project_path.is_none() {
                 if let Some(exe) = process.exe() {
                     if let Some(parent) = exe.parent() {
-                        project_path = find_project_root(parent).map(|p| p.to_string_lossy().to_string());
+                        project_path =
+                            find_project_root(parent).map(|p| p.to_string_lossy().to_string());
                     }
                 }
             }
@@ -100,8 +106,11 @@ fn scan_windows(sys: &System) -> Vec<PortInfo> {
         let project_name = extract_project_name(&project_path);
 
         ports.push(PortInfo {
-            port, pid, process_name,
-            project_path, project_name,
+            port,
+            pid,
+            process_name,
+            project_path,
+            project_name,
             protocol: "TCP".into(),
             start_cmd,
         });
@@ -118,8 +127,11 @@ fn kill_windows(pid: u32) -> Result<(), String> {
         .output()
         .map_err(|e| e.to_string())?;
 
-    if output.status.success() { Ok(()) }
-    else { Err(String::from_utf8_lossy(&output.stderr).to_string()) }
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).to_string())
+    }
 }
 
 // ─── macOS + Linux (shared lsof path) ────────────────────────────────────────
@@ -137,7 +149,9 @@ fn scan_unix(sys: &System) -> Vec<PortInfo> {
 
     for line in stdout.lines().skip(1) {
         let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.len() < 9 { continue; }
+        if parts.len() < 9 {
+            continue;
+        }
 
         let mut process_name = parts[0].to_string();
         let pid: u32 = match parts[1].parse() {
@@ -146,13 +160,14 @@ fn scan_unix(sys: &System) -> Vec<PortInfo> {
         };
 
         let name = parts[parts.len() - 1];
-        let port: u16 = match name.rsplit(':').next()
-            .and_then(|p| p.parse().ok()) {
+        let port: u16 = match name.rsplit(':').next().and_then(|p| p.parse().ok()) {
             Some(p) => p,
             None => continue,
         };
 
-        if seen_entries.contains(&(port, pid)) { continue; }
+        if seen_entries.contains(&(port, pid)) {
+            continue;
+        }
         seen_entries.insert((port, pid));
 
         let mut project_path = None;
@@ -160,7 +175,9 @@ fn scan_unix(sys: &System) -> Vec<PortInfo> {
 
         if let Some(process) = sys.process(sysinfo::Pid::from(pid as usize)) {
             let sys_name = process.name().to_string();
-            if !sys_name.is_empty() { process_name = sys_name; }
+            if !sys_name.is_empty() {
+                process_name = sys_name;
+            }
 
             if let Some(cwd) = process.cwd() {
                 project_path = find_project_root(cwd).map(|p| p.to_string_lossy().to_string());
@@ -179,8 +196,11 @@ fn scan_unix(sys: &System) -> Vec<PortInfo> {
         let project_name = extract_project_name(&project_path);
 
         ports.push(PortInfo {
-            port, pid, process_name,
-            project_path, project_name,
+            port,
+            pid,
+            process_name,
+            project_path,
+            project_name,
             protocol: "TCP".into(),
             start_cmd,
         });
@@ -206,22 +226,26 @@ fn get_project_path_unix_fallback(pid: u32) -> Option<String> {
             .ok()?;
 
         let s = String::from_utf8_lossy(&output.stdout);
-        let cwd = s.lines()
+        let cwd = s
+            .lines()
             .find(|l| l.starts_with('n') && l.len() > 1)
             .map(|l| l[1..].to_string())?;
 
-        find_project_root(std::path::Path::new(&cwd))
-            .map(|p| p.to_string_lossy().to_string())
+        find_project_root(std::path::Path::new(&cwd)).map(|p| p.to_string_lossy().to_string())
     }
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 fn kill_unix(pid: u32) -> Result<(), String> {
-    unsafe { libc::kill(pid as i32, libc::SIGTERM); }
+    unsafe {
+        libc::kill(pid as i32, libc::SIGTERM);
+    }
     std::thread::sleep(std::time::Duration::from_secs(2));
 
     if process_exists_unix(pid) {
-        unsafe { libc::kill(pid as i32, libc::SIGKILL); }
+        unsafe {
+            libc::kill(pid as i32, libc::SIGKILL);
+        }
     }
     Ok(())
 }
@@ -235,9 +259,14 @@ fn process_exists_unix(pid: u32) -> bool {
 
 fn find_project_root(start: &std::path::Path) -> Option<std::path::PathBuf> {
     let markers = [
-        "package.json", "Cargo.toml", "go.mod",
-        "pyproject.toml", "requirements.txt",
-        "pom.xml", "build.gradle", ".git",
+        "package.json",
+        "Cargo.toml",
+        "go.mod",
+        "pyproject.toml",
+        "requirements.txt",
+        "pom.xml",
+        "build.gradle",
+        ".git",
     ];
     let mut dir = start.to_path_buf();
     for _ in 0..6 {
@@ -246,7 +275,9 @@ fn find_project_root(start: &std::path::Path) -> Option<std::path::PathBuf> {
                 return Some(dir);
             }
         }
-        if !dir.pop() { break; }
+        if !dir.pop() {
+            break;
+        }
     }
     None
 }

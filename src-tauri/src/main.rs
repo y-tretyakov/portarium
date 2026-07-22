@@ -1,14 +1,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod scanner;
-mod tray;
 mod connections;
 mod logger;
+mod scanner;
+mod tray;
 
-#[macro_use]
-extern crate lazy_static;
-
-use tauri::Manager;
 use std::collections::HashMap;
 
 fn main() {
@@ -86,7 +82,14 @@ fn get_port_graph() -> connections::PortGraph {
     let ports = scanner::scan_ports();
     let listening: Vec<(u16, u32, String, Option<String>)> = ports
         .iter()
-        .map(|p| (p.port, p.pid, p.process_name.clone(), p.project_name.clone()))
+        .map(|p| {
+            (
+                p.port,
+                p.pid,
+                p.process_name.clone(),
+                p.project_name.clone(),
+            )
+        })
         .collect();
     connections::get_port_graph(&listening)
 }
