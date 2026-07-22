@@ -61,15 +61,15 @@ fn get_icon_bytes(state: &TrafficState) -> &'static [u8] {
 
 fn get_tooltip(state: &TrafficState, port_count: usize) -> String {
     match state {
-        TrafficState::Clear    => "PortPal — All clear".into(),
-        TrafficState::Active   => format!("PortPal — {} dev port{} active", port_count, if port_count == 1 { "" } else { "s" }),
-        TrafficState::Conflict => "PortPal — ⚠ Port conflict detected!".into(),
+        TrafficState::Clear    => "Portarium — All clear".into(),
+        TrafficState::Active   => format!("Portarium — {} dev port{} active", port_count, if port_count == 1 { "" } else { "s" }),
+        TrafficState::Conflict => "Portarium — ⚠ Port conflict detected!".into(),
     }
 }
 
 pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     // Build right-click menu
-    let open = MenuItemBuilder::new("Open PortPal").id("open").build(app)?;
+    let open = MenuItemBuilder::new("Open Portarium").id("open").build(app)?;
     let separator = PredefinedMenuItem::separator(app)?;
     let quit = MenuItemBuilder::new("Quit").id("quit").build(app)?;
 
@@ -84,7 +84,7 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
         .icon(tauri::image::Image::from_bytes(
             include_bytes!("../icons/tray-green.png")
         )?)
-        .tooltip("PortPal — Starting…")
+        .tooltip("Portarium — Starting…")
         .menu(&menu)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "open" => show_window(app),

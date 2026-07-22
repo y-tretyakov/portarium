@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "portpal",
+  "productName": "portarium",
   "version": "0.2.0",
-  "identifier": "com.aouko.portpal",
+  "identifier": "com.aouko.portarium",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -17,7 +17,7 @@
     },
     "windows": [
       {
-        "title": "PortPal",
+        "title": "Portarium",
         "width": 960,
         "height": 640,
         "minWidth": 780,

@@ -267,7 +267,7 @@ export default function App() {
       {/* ── Title bar ── */}
       <div className="titlebar" data-tauri-drag-region>
         <div className="titlebar-left">
-          <span className="titlebar-title">PortPal</span>
+          <span className="titlebar-title">Portarium</span>
         </div>
         <div className="titlebar-right">
           <button className="tb-btn" title="Minimize" onClick={() => getCurrentWindow().minimize()}>—</button>

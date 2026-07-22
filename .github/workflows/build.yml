@@ -54,14 +54,14 @@ jobs:
         if: matrix.platform == 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: portpal-windows-msi
+          name: portarium-windows-msi
           path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
 
       - name: Upload NSIS installer (Windows)
         if: matrix.platform == 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: portpal-windows-setup
+          name: portarium-windows-setup
           path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
 
       # Upload macOS installers
@@ -69,7 +69,7 @@ jobs:
         if: startsWith(matrix.platform, 'macos')
         uses: actions/upload-artifact@v4
         with:
-          name: portpal-macos-${{ matrix.target }}-dmg
+          name: portarium-macos-${{ matrix.target }}-dmg
           path: src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
 
   # Create a GitHub Release with all artifacts when a tag is pushed
@@ -95,7 +95,7 @@ jobs:
           make_latest: true
           generate_release_notes: true
           files: |
-            artifacts/portpal-windows-msi/*.msi
-            artifacts/portpal-windows-setup/*.exe
-            artifacts/portpal-macos-aarch64-apple-darwin-dmg/*.dmg
-            artifacts/portpal-macos-x86_64-apple-darwin-dmg/*.dmg
+            artifacts/portarium-windows-msi/*.msi
+            artifacts/portarium-windows-setup/*.exe
+            artifacts/portarium-macos-aarch64-apple-darwin-dmg/*.dmg
+            artifacts/portarium-macos-x86_64-apple-darwin-dmg/*.dmg
