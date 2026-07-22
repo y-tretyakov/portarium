@@ -34,20 +34,29 @@ jobs:
         with:
           target: ${{ matrix.target }}
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - name: Install Linux deps
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
 
-      - name: Build
+      - name: Build desktop (Tauri)
         run: npm ci && npm run tauri build
+
+      - name: Build TUI binary
+        run: bun build --compile --target=${{ matrix.target == 'x86_64-unknown-linux-gnu' && 'bun-linux-x64-modern' || matrix.target == 'x86_64-pc-windows-msvc' && 'bun-windows-x64-modern' || matrix.target == 'aarch64-apple-darwin' && 'bun-darwin-arm64' || 'bun-darwin-x64-modern' }} --outfile=portarium-tui${{ runner.os == 'Windows' && '.exe' || '' }} src-tui/index.tsx
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: portarium-${{ matrix.target }}
-          path: src-tauri/target/release/bundle/*
+          path: |
+            src-tauri/target/release/bundle/*
+            portarium-tui*
 
   create-release:
     needs: build-tauri
