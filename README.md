@@ -1,6 +1,6 @@
 <div align="center">
 
-![Portarium — Developer Port Manager](https://raw.githubusercontent.com/y-tretyakov/portarium/main/assets/hero.png)
+![Portarium — Developer Port Manager](https://raw.githubusercontent.com/y-tretyakov/portarium/main/social-preview.jpg)
 
 # ⚡ Portarium
 
