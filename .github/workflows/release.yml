@@ -59,14 +59,11 @@ jobs:
         run: npm run tauri build
 
       - name: Upload desktop packages
-        shell: bash
-        run: |
-          shopt -s globstar nullglob
-          bundles=(src-tauri/target/release/bundle/**/*.{deb,AppImage,dmg,msi,exe})
-          if [ ${#bundles[@]} -gt 0 ]; then
-            gh release upload "${{ github.ref_name }}" "${bundles[@]}"
-          else
-            echo "No bundle artifacts found"
-          fi
-        env:
-          GH_TOKEN: ${{ github.token }}
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            src-tauri/target/release/bundle/**/*.deb
+            src-tauri/target/release/bundle/**/*.AppImage
+            src-tauri/target/release/bundle/**/*.dmg
+            src-tauri/target/release/bundle/**/*.msi
+            src-tauri/target/release/bundle/**/*.exe
