@@ -81,10 +81,14 @@ pub fn build_port_graph(listening: &[ListeningEntry]) -> PortGraph {
 }
 
 fn build_clusters(node_map: &HashMap<u16, GraphNode>) -> Vec<crate::models::PortCluster> {
-    let mut cluster_map: std::collections::BTreeMap<String, Vec<String>> = std::collections::BTreeMap::new();
+    let mut cluster_map: std::collections::BTreeMap<String, Vec<String>> =
+        std::collections::BTreeMap::new();
     for node in node_map.values() {
         if let Some(ref cid) = node.cluster_id {
-            cluster_map.entry(cid.clone()).or_default().push(node.id.clone());
+            cluster_map
+                .entry(cid.clone())
+                .or_default()
+                .push(node.id.clone());
         }
     }
     cluster_map

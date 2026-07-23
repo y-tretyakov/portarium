@@ -156,7 +156,7 @@ fn print_graph_table(g: &PortGraph) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use portarium_core::models::{GraphEdge, GraphNode};
+    use portarium_core::models::{EdgeType, GraphEdge, GraphNode};
 
     fn make_port(port: u16, pid: u32, name: &str) -> PortInfo {
         PortInfo {
@@ -223,6 +223,7 @@ mod tests {
     #[test]
     fn print_graph_table_empty() {
         let g = PortGraph {
+            clusters: vec![],
             nodes: vec![],
             edges: vec![],
         };
@@ -232,12 +233,14 @@ mod tests {
     #[test]
     fn print_graph_table_with_nodes() {
         let g = PortGraph {
+            clusters: vec![],
             nodes: vec![GraphNode {
                 id: "port:3000".into(),
                 port: 3000,
                 pid: 1234,
                 process_name: "node".into(),
                 project_name: Some("my-app".into()),
+                cluster_id: Some("my-app".into()),
                 framework: Some("React".into()),
                 is_dev: true,
                 connection_count: 5,
@@ -246,6 +249,7 @@ mod tests {
                 source: "port:3000".into(),
                 target: "port:5432".into(),
                 active: true,
+                edge_type: EdgeType::TcpConnection,
             }],
         };
         print_graph_table(&g);
@@ -281,12 +285,14 @@ mod tests {
     #[test]
     fn print_graph_table_no_edges() {
         let g = PortGraph {
+            clusters: vec![],
             nodes: vec![GraphNode {
                 id: "port:3000".into(),
                 port: 3000,
                 pid: 1234,
                 process_name: "node".into(),
                 project_name: None,
+                cluster_id: None,
                 framework: None,
                 is_dev: false,
                 connection_count: 0,

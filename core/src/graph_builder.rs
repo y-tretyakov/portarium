@@ -36,7 +36,10 @@ impl GraphBuilder {
         let mut node_map: HashMap<String, GraphNode> = HashMap::new();
         for info in listening {
             let id = format!("port:{}", info.port);
-            let cluster_id = info.project_name.clone().or_else(|| detect_docker_compose_project(info));
+            let cluster_id = info
+                .project_name
+                .clone()
+                .or_else(|| detect_docker_compose_project(info));
             node_map.insert(
                 id.clone(),
                 GraphNode {
@@ -73,7 +76,14 @@ impl GraphBuilder {
             let dst_listen = node_map.contains_key(&dst_id);
 
             if src_listen && dst_listen {
-                Self::add_edge(edges, seen_edges, node_map, &src_id, &dst_id, EdgeType::TcpConnection);
+                Self::add_edge(
+                    edges,
+                    seen_edges,
+                    node_map,
+                    &src_id,
+                    &dst_id,
+                    EdgeType::TcpConnection,
+                );
                 continue;
             }
 
@@ -82,7 +92,14 @@ impl GraphBuilder {
                     for sp in src_ports {
                         let sp_id = format!("port:{sp}");
                         if sp_id != dst_id {
-                            Self::add_edge(edges, seen_edges, node_map, &sp_id, &dst_id, EdgeType::TcpConnection);
+                            Self::add_edge(
+                                edges,
+                                seen_edges,
+                                node_map,
+                                &sp_id,
+                                &dst_id,
+                                EdgeType::TcpConnection,
+                            );
                         }
                     }
                 }
@@ -92,7 +109,14 @@ impl GraphBuilder {
                     for dp in dst_ports {
                         let dp_id = format!("port:{dp}");
                         if dp_id != src_id {
-                            Self::add_edge(edges, seen_edges, node_map, &src_id, &dp_id, EdgeType::TcpConnection);
+                            Self::add_edge(
+                                edges,
+                                seen_edges,
+                                node_map,
+                                &src_id,
+                                &dp_id,
+                                EdgeType::TcpConnection,
+                            );
                         }
                     }
                 }
@@ -139,7 +163,7 @@ impl GraphBuilder {
         let mut cluster_groups: BTreeMap<String, Vec<&GraphNode>> = BTreeMap::new();
         for node in node_map.values() {
             if let Some(ref cid) = node.cluster_id {
-                if cid != &node.project_name.as_deref().unwrap_or("") {
+                if cid != node.project_name.as_deref().unwrap_or("") {
                     cluster_groups.entry(cid.clone()).or_default().push(node);
                 }
             }
@@ -172,9 +196,19 @@ impl GraphBuilder {
         b: &str,
         edge_type: EdgeType,
     ) {
-        let a_port = a.strip_prefix("port:").and_then(|s| s.parse::<u16>().ok()).unwrap_or(0);
-        let b_port = b.strip_prefix("port:").and_then(|s| s.parse::<u16>().ok()).unwrap_or(0);
-        let key = if a_port < b_port { (a_port, b_port) } else { (b_port, a_port) };
+        let a_port = a
+            .strip_prefix("port:")
+            .and_then(|s| s.parse::<u16>().ok())
+            .unwrap_or(0);
+        let b_port = b
+            .strip_prefix("port:")
+            .and_then(|s| s.parse::<u16>().ok())
+            .unwrap_or(0);
+        let key = if a_port < b_port {
+            (a_port, b_port)
+        } else {
+            (b_port, a_port)
+        };
         if seen.insert(key) {
             edges.push(GraphEdge {
                 source: a.to_string(),
@@ -189,7 +223,10 @@ impl GraphBuilder {
         let mut cluster_map: BTreeMap<String, Vec<String>> = BTreeMap::new();
         for node in node_map.values() {
             if let Some(ref cid) = node.cluster_id {
-                cluster_map.entry(cid.clone()).or_default().push(node.id.clone());
+                cluster_map
+                    .entry(cid.clone())
+                    .or_default()
+                    .push(node.id.clone());
             }
         }
         cluster_map
@@ -230,26 +267,43 @@ fn get_active_connections() -> Vec<Connection> {
 
 #[cfg(target_os = "windows")]
 fn get_connections_windows() -> Vec<Connection> {
-    let output = match std::process::Command::new("netstat").args(["-ano"]).output() {
+    let output = match std::process::Command::new("netstat")
+        .args(["-ano"])
+        .output()
+    {
         Ok(o) => o,
         Err(_) => return vec![],
     };
     let stdout = String::from_utf8_lossy(&output.stdout);
     let mut raw_conns: Vec<(u16, u16, u32)> = Vec::new();
     for line in stdout.lines() {
-        if !line.contains("ESTABLISHED") { continue; }
+        if !line.contains("ESTABLISHED") {
+            continue;
+        }
         let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.len() < 5 { continue; }
-        let src_port = parts[1].rsplit(':').next().and_then(|p| p.parse::<u16>().ok());
-        let dst_port = parts[2].rsplit(':').next().and_then(|p| p.parse::<u16>().ok());
+        if parts.len() < 5 {
+            continue;
+        }
+        let src_port = parts[1]
+            .rsplit(':')
+            .next()
+            .and_then(|p| p.parse::<u16>().ok());
+        let dst_port = parts[2]
+            .rsplit(':')
+            .next()
+            .and_then(|p| p.parse::<u16>().ok());
         let pid: Option<u32> = parts[4].parse().ok();
         if let (Some(s), Some(d), Some(p)) = (src_port, dst_port, pid) {
-            if p == 0 { continue; }
+            if p == 0 {
+                continue;
+            }
             raw_conns.push((s, d, p));
         }
     }
     let mut port_pid: HashMap<u16, u32> = HashMap::new();
-    for (s, _d, pid) in &raw_conns { port_pid.insert(*s, *pid); }
+    for (s, _d, pid) in &raw_conns {
+        port_pid.insert(*s, *pid);
+    }
     let mut conns = Vec::new();
     for (s, d, src_pid) in &raw_conns {
         let dst_pid = port_pid.get(d).copied().unwrap_or(0);
@@ -261,7 +315,8 @@ fn get_connections_windows() -> Vec<Connection> {
 #[cfg(target_os = "macos")]
 fn get_connections_macos() -> Vec<Connection> {
     let output = match std::process::Command::new("lsof")
-        .args(["-iTCP", "-sTCP:ESTABLISHED", "-n", "-P"]).output()
+        .args(["-iTCP", "-sTCP:ESTABLISHED", "-n", "-P"])
+        .output()
     {
         Ok(o) => o,
         Err(_) => return vec![],
@@ -270,14 +325,29 @@ fn get_connections_macos() -> Vec<Connection> {
     let mut conns = Vec::new();
     for line in stdout.lines().skip(1) {
         let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.len() < 9 { continue; }
-        let pid: u32 = match parts[1].parse() { Ok(p) => p, Err(_) => continue };
+        if parts.len() < 9 {
+            continue;
+        }
+        let pid: u32 = match parts[1].parse() {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
         let name = parts[parts.len() - 1];
-        if !name.contains("->") { continue; }
+        if !name.contains("->") {
+            continue;
+        }
         let mut sides = name.split("->");
-        let src = sides.next().and_then(|s| s.rsplit(':').next()).and_then(|p| p.parse::<u16>().ok());
-        let dst = sides.next().and_then(|s| s.rsplit(':').next()).and_then(|p| p.parse::<u16>().ok());
-        if let (Some(s), Some(d)) = (src, dst) { conns.push((s, d, pid, 0)); }
+        let src = sides
+            .next()
+            .and_then(|s| s.rsplit(':').next())
+            .and_then(|p| p.parse::<u16>().ok());
+        let dst = sides
+            .next()
+            .and_then(|s| s.rsplit(':').next())
+            .and_then(|p| p.parse::<u16>().ok());
+        if let (Some(s), Some(d)) = (src, dst) {
+            conns.push((s, d, pid, 0));
+        }
     }
     conns
 }
@@ -285,7 +355,8 @@ fn get_connections_macos() -> Vec<Connection> {
 #[cfg(target_os = "linux")]
 fn get_connections_linux() -> Vec<Connection> {
     let output = match std::process::Command::new("ss")
-        .args(["-tnp", "state", "established"]).output()
+        .args(["-tnp", "state", "established"])
+        .output()
     {
         Ok(o) => o,
         Err(_) => return vec![],
@@ -294,15 +365,26 @@ fn get_connections_linux() -> Vec<Connection> {
     let mut conns = Vec::new();
     for line in stdout.lines().skip(1) {
         let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.len() < 6 { continue; }
-        let src = parts[3].rsplit(':').next().and_then(|p| p.parse::<u16>().ok());
-        let dst = parts[4].rsplit(':').next().and_then(|p| p.parse::<u16>().ok());
+        if parts.len() < 6 {
+            continue;
+        }
+        let src = parts[3]
+            .rsplit(':')
+            .next()
+            .and_then(|p| p.parse::<u16>().ok());
+        let dst = parts[4]
+            .rsplit(':')
+            .next()
+            .and_then(|p| p.parse::<u16>().ok());
         let pid: u32 = parts[5]
-            .split("pid=").nth(1)
+            .split("pid=")
+            .nth(1)
             .and_then(|s| s.split(&[',', ')']).next())
             .and_then(|p| p.parse().ok())
             .unwrap_or(0);
-        if let (Some(s), Some(d)) = (src, dst) { conns.push((s, d, pid, 0)); }
+        if let (Some(s), Some(d)) = (src, dst) {
+            conns.push((s, d, pid, 0));
+        }
     }
     conns
 }
@@ -359,7 +441,11 @@ mod tests {
             make_port_info(3001, 101, "node", Some("myapp")),
         ];
         let graph = GraphBuilder::build(&ports);
-        let project_edges: Vec<_> = graph.edges.iter().filter(|e| e.edge_type == EdgeType::ProjectPeer).collect();
+        let project_edges: Vec<_> = graph
+            .edges
+            .iter()
+            .filter(|e| e.edge_type == EdgeType::ProjectPeer)
+            .collect();
         assert!(!project_edges.is_empty());
     }
 
@@ -375,9 +461,7 @@ mod tests {
 
     #[test]
     fn cluster_id_matches_project_name() {
-        let ports = vec![
-            make_port_info(3000, 100, "node", Some("myapp")),
-        ];
+        let ports = vec![make_port_info(3000, 100, "node", Some("myapp"))];
         let graph = GraphBuilder::build(&ports);
         let node = &graph.nodes[0];
         assert_eq!(node.cluster_id.as_deref(), Some("myapp"));

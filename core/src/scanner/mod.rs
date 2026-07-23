@@ -154,10 +154,7 @@ fn scan_lsof(sys: &mut System) -> Result<Vec<PortInfo>> {
 /// Read `/proc/net/tcp` (world-readable on Linux) and discover listening ports
 /// that were missed by `lsof` (e.g. Docker-mapped ports owned by root).
 #[cfg(target_os = "linux")]
-fn scan_proc_net_tcp(
-    sys: &mut System,
-    seen: &mut HashSet<(u16, u32)>,
-) -> Result<Vec<PortInfo>> {
+fn scan_proc_net_tcp(sys: &mut System, seen: &mut HashSet<(u16, u32)>) -> Result<Vec<PortInfo>> {
     let mut ports: Vec<PortInfo> = Vec::new();
     // Track ports we already found via lsof (by port number alone)
     let mut seen_ports: HashSet<u16> = seen.iter().map(|(p, _)| *p).collect();
@@ -301,7 +298,7 @@ fn build_docker_proxy_map() -> HashMap<u16, DockerProxyEntry> {
         // Extract host-port from: -host-port <PORT>
         if let Some(pos) = cmdline.find("-host-port") {
             let after = &cmdline[pos + "-host-port".len()..];
-            let port_str = after.trim_start().split_whitespace().next().unwrap_or("");
+            let port_str = after.split_whitespace().next().unwrap_or("");
             if let Ok(port) = port_str.parse::<u16>() {
                 let cmdline_full = Some(cmdline);
                 map.entry(port).or_insert(DockerProxyEntry {
@@ -379,12 +376,7 @@ fn detect_docker_compose_for_pid(pid: u32) -> Option<String> {
 
     // Try docker inspect to get labels (truncated container ID is often sufficient)
     let output = std::process::Command::new("docker")
-        .args([
-            "inspect",
-            &container_id,
-            "--format",
-            "{{.Config.Labels}}",
-        ])
+        .args(["inspect", &container_id, "--format", "{{.Config.Labels}}"])
         .output()
         .ok()?;
 
@@ -433,8 +425,14 @@ pub(crate) fn match_docker_ports_to_project(ports: &[(u16, u32)]) -> HashMap<u16
     let stdout = String::from_utf8_lossy(&output.stdout);
     for line in stdout.lines() {
         let mut parts = line.splitn(3, '\t');
-        let _id = match parts.next() { Some(id) => id, None => continue };
-        let port_str = match parts.next() { Some(s) => s, None => continue };
+        let _id = match parts.next() {
+            Some(id) => id,
+            None => continue,
+        };
+        let port_str = match parts.next() {
+            Some(s) => s,
+            None => continue,
+        };
         let project = parts.next().unwrap_or("");
 
         if project.is_empty() {

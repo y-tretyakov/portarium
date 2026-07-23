@@ -1,5 +1,5 @@
 use portarium_core::models::{
-    EventType, GraphEdge, GraphNode, PortEvent, PortGraph, PortInfo, TrafficSample,
+    EdgeType, EventType, GraphEdge, GraphNode, PortEvent, PortGraph, PortInfo, TrafficSample,
 };
 
 /// Helper to create a test PortInfo.
@@ -48,12 +48,14 @@ fn cli_event_creation() {
 #[test]
 fn cli_graph_creation() {
     let graph = PortGraph {
+        clusters: vec![],
         nodes: vec![GraphNode {
             id: "port:3000".into(),
             port: 3000,
             pid: 1234,
             process_name: "node".into(),
             project_name: Some("my-app".into()),
+            cluster_id: Some("my-app".into()),
             framework: Some("React".into()),
             is_dev: true,
             connection_count: 5,
@@ -62,6 +64,7 @@ fn cli_graph_creation() {
             source: "port:3000".into(),
             target: "port:5432".into(),
             active: true,
+            edge_type: EdgeType::TcpConnection,
         }],
     };
     assert_eq!(graph.nodes.len(), 1);
