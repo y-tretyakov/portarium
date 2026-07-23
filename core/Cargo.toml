@@ -4,7 +4,11 @@ version.workspace = true
 edition.workspace = true
 description = "Core library for Portarium - process port management"
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 readme = "README.md"
+keywords = ["port", "process", "manager", "scanner", "tui"]
+categories = ["development-tools::debugging"]
 
 [dependencies]
 serde.workspace = true

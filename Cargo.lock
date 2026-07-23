@@ -3372,7 +3372,7 @@ checksum = "3d20d5497ef88037a52ff98267d066e7f11fcc5e99bbfbd58a42336193aacec3"
 
 [[package]]
 name = "portarium"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "portarium-core",
  "regex",
@@ -3387,7 +3387,7 @@ dependencies = [
 
 [[package]]
 name = "portarium-cli"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "clap",
  "color-eyre",
@@ -3399,7 +3399,7 @@ dependencies = [
 
 [[package]]
 name = "portarium-core"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "chrono",
  "libc",
@@ -3415,7 +3415,7 @@ dependencies = [
 
 [[package]]
 name = "portarium-tui"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "clap",
  "color-eyre",

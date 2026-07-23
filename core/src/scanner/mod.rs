@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::process::Command;
 
 use sysinfo::System;
@@ -13,78 +13,26 @@ pub(crate) trait ScannerBackend: Send {
         Self: Sized;
 }
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+// ── Linux scanner: reads /proc/net/tcp + docker-proxy cmdline matching ──
+#[cfg(target_os = "linux")]
 pub(crate) struct UnixScanner;
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(target_os = "linux")]
 impl ScannerBackend for UnixScanner {
     fn scan(&mut self, sys: &mut System) -> Result<Vec<PortInfo>> {
-        let output = Command::new("lsof")
-            .args(["-iTCP", "-sTCP:LISTEN", "-n", "-P"])
-            .output()?;
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
         let mut ports: Vec<PortInfo> = Vec::new();
         let mut seen: HashSet<(u16, u32)> = HashSet::new();
 
-        for line in stdout.lines().skip(1) {
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() < 9 {
-                continue;
-            }
-
-            let mut process_name = parts[0].to_string();
-            let pid: u32 = match parts[1].parse() {
-                Ok(p) => p,
-                Err(_) => continue,
-            };
-
-            let name = parts[parts.len() - 1];
-            let port: u16 = match name.rsplit(':').next().and_then(|p| p.parse().ok()) {
-                Some(p) => p,
-                None => continue,
-            };
-
-            if seen.contains(&(port, pid)) {
-                continue;
-            }
-            seen.insert((port, pid));
-
-            let mut project_path = None;
-            let mut start_cmd = None;
-
-            if let Some(process) = sys.process(sysinfo::Pid::from(pid as usize)) {
-                let sys_name = process.name().to_string();
-                if !sys_name.is_empty() {
-                    process_name = sys_name;
-                }
-
-                if let Some(cwd) = process.cwd() {
-                    project_path = find_project_root(cwd).map(|p| p.to_string_lossy().to_string());
-                }
-
-                let cmd = process.cmd().join(" ");
-                if !cmd.trim().is_empty() {
-                    start_cmd = Some(cmd);
-                }
-            }
-
-            if project_path.is_none() {
-                project_path = get_project_path_unix_fallback(pid);
-            }
-
-            let project_name = extract_project_name(&project_path);
-
-            ports.push(PortInfo {
-                port,
-                pid,
-                process_name,
-                project_path,
-                project_name,
-                protocol: "TCP".into(),
-                start_cmd,
-            });
+        // 1. Try lsof first for user-visible processes (gives richer info)
+        let lsof_ports = scan_lsof(sys)?;
+        for p in &lsof_ports {
+            seen.insert((p.port, p.pid));
         }
+        ports.extend(lsof_ports);
+
+        // 2. Supplement with /proc/net/tcp to catch Docker / root-owned ports
+        let tcp_ports = scan_proc_net_tcp(sys, &mut seen)?;
+        ports.extend(tcp_ports);
 
         ports.sort_by_key(|p| p.port);
         Ok(ports)
@@ -105,9 +53,278 @@ impl ScannerBackend for UnixScanner {
     }
 }
 
+// ── macOS scanner: uses lsof (existing behaviour) ──
+#[cfg(target_os = "macos")]
+pub(crate) struct UnixScanner;
+
+#[cfg(target_os = "macos")]
+impl ScannerBackend for UnixScanner {
+    fn scan(&mut self, sys: &mut System) -> Result<Vec<PortInfo>> {
+        scan_lsof(sys)
+    }
+
+    fn kill(pid: u32) -> Result<()> {
+        unsafe {
+            libc::kill(pid as i32, libc::SIGTERM);
+        }
+        std::thread::sleep(std::time::Duration::from_secs(2));
+
+        if process_exists_unix(pid) {
+            unsafe {
+                libc::kill(pid as i32, libc::SIGKILL);
+            }
+        }
+        Ok(())
+    }
+}
+
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 fn process_exists_unix(pid: u32) -> bool {
     unsafe { libc::kill(pid as i32, 0) == 0 }
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+fn scan_lsof(sys: &mut System) -> Result<Vec<PortInfo>> {
+    let output = Command::new("lsof")
+        .args(["-iTCP", "-sTCP:LISTEN", "-n", "-P"])
+        .output()?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut ports: Vec<PortInfo> = Vec::new();
+    let mut seen: HashSet<(u16, u32)> = HashSet::new();
+
+    for line in stdout.lines().skip(1) {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() < 9 {
+            continue;
+        }
+
+        let pid: u32 = match parts[1].parse() {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
+
+        // The NAME column may be followed by (LISTEN) as a separate token,
+        // so scan backwards from the end to find the address:port token.
+        let port: u16 = match parts
+            .iter()
+            .rev()
+            .find_map(|t| t.rsplit(':').next().and_then(|p| p.parse().ok()))
+        {
+            Some(p) => p,
+            None => continue,
+        };
+
+        if seen.contains(&(port, pid)) {
+            continue;
+        }
+        seen.insert((port, pid));
+
+        let process_name = parts[0].to_string();
+        let (project_path, start_cmd) = get_process_info(sys, pid);
+
+        let project_name = extract_project_name(&project_path);
+
+        ports.push(PortInfo {
+            port,
+            pid,
+            process_name,
+            project_path,
+            project_name,
+            protocol: "TCP".into(),
+            start_cmd,
+        });
+    }
+
+    Ok(ports)
+}
+
+/// Read `/proc/net/tcp` (world-readable on Linux) and discover listening ports
+/// that were missed by `lsof` (e.g. Docker-mapped ports owned by root).
+#[cfg(target_os = "linux")]
+fn scan_proc_net_tcp(
+    sys: &mut System,
+    seen: &mut HashSet<(u16, u32)>,
+) -> Result<Vec<PortInfo>> {
+    let mut ports: Vec<PortInfo> = Vec::new();
+    // Track ports we already found via lsof (by port number alone)
+    let mut seen_ports: HashSet<u16> = seen.iter().map(|(p, _)| *p).collect();
+
+    let tcp_content = match std::fs::read_to_string("/proc/net/tcp") {
+        Ok(c) => c,
+        Err(_) => {
+            // /proc/net/tcp is not available (unlikely on Linux) – skip silently
+            return Ok(ports);
+        }
+    };
+
+    // Pre-build a map of host-port → PID from docker-proxy cmdlines
+    let docker_proxy_map = build_docker_proxy_map();
+
+    for line in tcp_content.lines().skip(1) {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() < 10 {
+            continue;
+        }
+
+        // 0A = TCP_LISTEN
+        if parts[3] != "0A" {
+            continue;
+        }
+
+        let port_hex = parts[1].split(':').nth(1).unwrap_or("0");
+        let port = match u16::from_str_radix(port_hex, 16) {
+            Ok(p) if p != 0 => p,
+            _ => continue,
+        };
+
+        if seen_ports.contains(&port) {
+            continue;
+        }
+        seen_ports.insert(port);
+
+        let mut pid = 0u32;
+        let mut process_name = String::new();
+        let mut start_cmd: Option<String> = None;
+
+        // Try docker-proxy matching
+        if let Some(dp) = docker_proxy_map.get(&port) {
+            pid = dp.pid;
+            process_name = "docker-proxy".into();
+            start_cmd = dp.cmdline.clone();
+        }
+
+        seen.insert((port, pid));
+
+        if pid != 0 {
+            if let Some(process) = sys.process(sysinfo::Pid::from(pid as usize)) {
+                let sys_name = process.name().to_string();
+                if !sys_name.is_empty() {
+                    process_name = sys_name;
+                }
+                if start_cmd.is_none() {
+                    let cmd = process.cmd().join(" ");
+                    if !cmd.trim().is_empty() {
+                        start_cmd = Some(cmd);
+                    }
+                }
+            }
+        }
+
+        if process_name.is_empty() {
+            process_name = if pid != 0 {
+                format!("PID {pid}")
+            } else {
+                "unknown".into()
+            };
+        }
+
+        let project_path = None;
+        let project_name = extract_project_name(&project_path);
+
+        ports.push(PortInfo {
+            port,
+            pid,
+            process_name,
+            project_path,
+            project_name,
+            protocol: "TCP".into(),
+            start_cmd,
+        });
+    }
+
+    Ok(ports)
+}
+
+#[cfg(target_os = "linux")]
+struct DockerProxyEntry {
+    pid: u32,
+    cmdline: Option<String>,
+}
+
+/// Scan `/proc/*/cmdline` (world-readable) to find docker-proxy processes
+/// and map their host-port to a PID.
+#[cfg(target_os = "linux")]
+fn build_docker_proxy_map() -> HashMap<u16, DockerProxyEntry> {
+    let mut map = HashMap::new();
+
+    let proc_dir = match std::fs::read_dir("/proc") {
+        Ok(d) => d,
+        Err(_) => return map,
+    };
+
+    for entry in proc_dir.flatten() {
+        let name = entry.file_name();
+        let name_str = match name.to_str() {
+            Some(s) => s,
+            None => continue,
+        };
+        if !name_str.bytes().all(|b| b.is_ascii_digit()) {
+            continue;
+        }
+
+        let pid: u32 = match name_str.parse() {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
+
+        let cmdline_path = entry.path().join("cmdline");
+        let cmdline_bytes = match std::fs::read(&cmdline_path) {
+            Ok(b) => b,
+            Err(_) => continue,
+        };
+
+        // cmdline uses \0 as separator; we join with space for parsing
+        let cmdline: String = cmdline_bytes
+            .split(|&b| b == 0)
+            .filter(|s| !s.is_empty())
+            .filter_map(|s| std::str::from_utf8(s).ok())
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        if !cmdline.contains("docker-proxy") {
+            continue;
+        }
+
+        // Extract host-port from: -host-port <PORT>
+        if let Some(pos) = cmdline.find("-host-port") {
+            let after = &cmdline[pos + "-host-port".len()..];
+            let port_str = after.trim_start().split_whitespace().next().unwrap_or("");
+            if let Ok(port) = port_str.parse::<u16>() {
+                let cmdline_full = Some(cmdline);
+                map.entry(port).or_insert(DockerProxyEntry {
+                    pid,
+                    cmdline: cmdline_full,
+                });
+            }
+        }
+    }
+
+    map
+}
+
+/// Fetch process info from sysinfo (works for accessible processes).
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+fn get_process_info(sys: &mut System, pid: u32) -> (Option<String>, Option<String>) {
+    let mut project_path = None;
+    let mut start_cmd = None;
+
+    if let Some(process) = sys.process(sysinfo::Pid::from(pid as usize)) {
+        if let Some(cwd) = process.cwd() {
+            project_path = find_project_root(cwd).map(|p| p.to_string_lossy().to_string());
+        }
+
+        let cmd = process.cmd().join(" ");
+        if !cmd.trim().is_empty() {
+            start_cmd = Some(cmd);
+        }
+    }
+
+    if project_path.is_none() {
+        project_path = get_project_path_unix_fallback(pid);
+    }
+
+    (project_path, start_cmd)
 }
 
 #[cfg(target_os = "windows")]

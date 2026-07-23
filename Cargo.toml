@@ -8,9 +8,11 @@ members = [
 ]
 
 [workspace.package]
-version = "0.6.1"
+version = "0.6.2"
 edition = "2021"
 license = "MIT"
+repository = "https://github.com/y-tretyakov/portarium"
+homepage = "https://github.com/y-tretyakov/portarium"
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
