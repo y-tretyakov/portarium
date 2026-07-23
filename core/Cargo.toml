@@ -2,6 +2,9 @@
 name = "portarium-core"
 version.workspace = true
 edition.workspace = true
+description = "Core library for Portarium - process port management"
+license.workspace = true
+readme = "README.md"
 
 [dependencies]
 serde.workspace = true

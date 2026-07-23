@@ -158,6 +158,235 @@ Portarium auto-detects these frameworks out-of-the-box:
 
 ---
 
+## Diagnostic & Testing Guide
+
+### Spawning Test Services
+
+Quickly populate ports to exercise Portarium:
+
+```bash
+# Python — one-shot HTTP servers on popular ports
+python3 -m http.server 3000  --bind 127.0.0.1 &   # React dev port
+python3 -m http.server 4200  --bind 127.0.0.1 &   # Angular
+python3 -m http.server 5173  --bind 127.0.0.1 &   # Vite
+python3 -m http.server 8000  --bind 127.0.0.1 &   # Django
+python3 -m http.server 8080  --bind 127.0.0.1 &   # HTTP
+python3 -m http.server 5432  --bind 127.0.0.1 &   # Postgres (simulated)
+python3 -m http.server 6379  --bind 127.0.0.1 &   # Redis (simulated)
+python3 -m http.server 3306  --bind 127.0.0.1 &   # MySQL (simulated)
+python3 -m http.server 27017 --bind 127.0.0.1 &   # MongoDB (simulated)
+python3 -m http.server 9000  --bind 127.0.0.1 &   # PHP
+python3 -m http.server 1420  --bind 127.0.0.1 &   # Tauri
+python3 -m http.server 8888  --bind 127.0.0.1 &   # Jupyter
+
+# Node.js (if installed)
+npx serve -l 3000 &
+npx serve -l 4000 &
+
+# Netcat — lightweight listeners
+nc -lk 3000 &
+nc -lk 5000 &
+nc -lk 6000 &
+
+# macOS — use any port with the built-in Python or:
+socat TCP-LISTEN:3000,fork,reuseaddr EXEC:cat &
+```
+
+### Stopping Test Services
+
+```bash
+# Kill by PID (find with Portarium or ps)
+kill -9 <PID>
+
+# Kill all test Python servers
+pkill -f "python3 -m http.server"
+
+# Kill all netcat listeners
+pkill nc
+
+# Kill everything on common dev ports (macOS/Linux)
+lsof -ti:3000,4200,5173,8000,8080,5432,6379,3306,27017,9000,1420,8888 | xargs kill -9
+
+# Kill a range of ports
+lsof -ti:3000-9000 | xargs kill -9
+```
+
+### Diagnostic Checklist
+
+Walk through these steps to verify every Portarium feature:
+
+| # | Test | CLI | TUI | Desktop |
+|---|------|-----|-----|---------|
+| 1 | List all listening ports | `cargo run -p portarium-cli -- list` | Launch TUI, verify Ports page (1) | Open app → Ports page |
+| 2 | List as JSON | `cargo run -p portarium-cli -- list --json` | — | — |
+| 3 | Watch live updates | `cargo run -p portarium-cli -- watch` | Ports auto-refresh every 5s | Background thread polls every 2s |
+| 4 | Watch with custom interval | `cargo run -p portarium-cli -- watch --interval 5` | — | — |
+| 5 | View event log | `cargo run -p portarium-cli -- events` | Switch to Logs page (4) | Navigate to Logs page |
+| 6 | Filter events by port | `cargo run -p portarium-cli -- events --port 3000` | — | — |
+| 7 | View connection graph | `cargo run -p portarium-cli -- graph` | Switch to Graph screen (3) | Navigate to Port Map page |
+| 8 | View traffic for a port | `cargo run -p portarium-cli -- traffic 3000` | Select a port → Enter → Detail (2) | Navigate to Traffic page |
+| 9 | Kill a process by PID | `cargo run -p portarium-cli -- kill <pid>` | Select port → press `k` | Click kill button on port row |
+| 10 | Kill all filtered | — | Press `K` | Click "Kill All" button |
+| 11 | Restart a process | `cargo run -p portarium-cli -- restart <pid> --cmd "python3 -m http.server 3000" --cwd /tmp` | Select port → press `r` | Click restart button |
+| 12 | Filter dev ports only | — | Press `f` to cycle filter | Click "Dev" filter tab |
+| 13 | Search by name/port | — | Press `/` to enter search | Type in search bar |
+| 14 | Force refresh | — | Press `u` | Click refresh button |
+| 15 | Tray icon states | — | — | Minimize window; tray icon shows green/yellow/red |
+| 16 | Port map visualization | — | — | Navigate to Port Map page |
+| 17 | Service grouping | — | Switch to Services page (3) | Navigate to Services page |
+
+### Debugging & Logging
+
+```bash
+# Enable debug-level tracing (TUI only)
+RUST_LOG=debug cargo run -p portarium-tui
+
+# Module-specific tracing
+RUST_LOG=portarium_tui=debug cargo run -p portarium-tui
+
+# Full backtrace on panic
+RUST_BACKTRACE=1 cargo run -p portarium-tui
+
+# Combine tracing + backtrace
+RUST_LOG=debug RUST_BACKTRACE=full cargo run -p portarium-tui
+
+# CLI with color-eyre error reporting (always enabled)
+cargo run -p portarium-cli -- list
+
+# Pipe JSON output for scripting
+cargo run -p portarium-cli -- list --json | jq '.'
+cargo run -p portarium-cli -- events --json | jq '.[] | select(.port == 3000)'
+cargo run -p portarium-cli -- graph --json | jq '.nodes[] | {pid, process, port}'
+```
+
+### Platform-Specific Notes
+
+| Platform | Scanner | Kill | Restart |
+|----------|---------|------|---------|
+| **Linux** | `lsof -iTCP -sTCP:LISTEN -n -P` | `SIGTERM` → 2s → `SIGKILL` | `command &` (detached) |
+| **macOS** | `lsof -iTCP -sTCP:LISTEN -n -P` | `SIGTERM` → 2s → `SIGKILL` | `command &` (detached) |
+| **Windows** | `netstat -ano` | `taskkill /PID <pid> /F` | `cmd /C start cmd /K <cmd>` |
+
+### All Interface Commands Reference
+
+#### CLI (`portarium-cli`)
+
+```bash
+# Build
+cargo build -p portarium-cli
+
+# Run directly
+cargo run -p portarium-cli -- <subcommand> [flags]
+
+# Help
+cargo run -p portarium-cli -- --help
+cargo run -p portarium-cli -- <subcommand> --help
+
+# Available subcommands:
+#   list       List all listening ports
+#   watch      Poll and display ports in real-time
+#   events     Show port event log
+#   graph      Show connection graph
+#   traffic    Show traffic for a specific port
+#   kill       Kill a process by PID
+#   restart    Kill and restart a process
+```
+
+| Subcommand | Arguments | Flags | Description |
+|------------|-----------|-------|-------------|
+| `list` | — | `--json` | Table or JSON of all open ports |
+| `watch` | — | `--interval <sec>` (default: 2), `--json` | Live polling port list |
+| `events` | — | `--port <u16>`, `--json` | Event log, optional port filter |
+| `graph` | — | `--json` | Connection graph nodes/edges |
+| `traffic` | `<port>` | `--json` | Traffic samples for a port |
+| `kill` | `<pid>` | — | Terminate a process |
+| `restart` | `<pid>` | `--cmd <str>` `--cwd <str>` | Kill then spawn replacement |
+
+#### TUI (`portarium-tui`)
+
+```bash
+# Build & run
+cargo build -p portarium-tui
+cargo run -p portarium-tui
+
+# With debug logging
+RUST_LOG=debug cargo run -p portarium-tui
+
+# Help overlay inside TUI: press ?
+```
+
+| Key | Action |
+|-----|--------|
+| `↑` / `k` | Navigate up |
+| `↓` / `j` | Navigate down |
+| `Enter` | Select port (go to Detail screen) |
+| `Esc` / `Backspace` | Back to Dashboard |
+| `1` | Dashboard (port list) screen |
+| `2` | Detail screen (port info + timeline) |
+| `3` | Graph screen (connection graph) |
+| `r` | Trigger manual scan |
+| `?` | Toggle help overlay |
+| `q` / `Ctrl+C` | Quit |
+
+#### JS TUI (`npx portarium` / `src-tui`)
+
+```bash
+# Via npm
+npx portarium
+
+# From source
+bun run src-tui/index.tsx
+
+# Or via the bin alias
+portarium
+```
+
+| Key | Action |
+|-----|--------|
+| `↑` / `↓` | Navigate port list |
+| `j` | Navigate down |
+| `k` | Kill selected process |
+| `K` | Kill all filtered processes |
+| `r` | Restart selected (if start_cmd known) |
+| `/` | Enter search mode |
+| `Esc` | Clear / exit search |
+| `f` | Cycle filter: all → dev → other |
+| `1` | Ports page |
+| `2` | Dashboard page |
+| `3` | Services page |
+| `4` | Logs page |
+| `Tab` | Cycle pages forward |
+| `Shift+Tab` | Cycle pages backward |
+| `u` | Force refresh |
+| `q` / `Ctrl+C` | Quit |
+
+#### Desktop App (Tauri)
+
+```bash
+# Development mode with hot reload
+npm install
+npm run tauri dev
+
+# Production build
+npm run tauri build
+
+# Frontend dev server only (browser)
+npm run dev
+```
+
+| Interface | Feature | How to access |
+|-----------|---------|---------------|
+| **Sidebar nav** | Dashboard / Ports / Traffic / Port Map / Services / Settings / Logs | Click sidebar icons |
+| **Ports table** | Search bar, filter tabs (All/Dev/Other), kill/restart buttons, sparklines | Ports page |
+| **Port Map** | D3.js force-directed graph with animated particles, zoom, drag, node inspector | Port Map page |
+| **Traffic monitor** | Per-port sparkline charts, current/peak connections | Traffic page |
+| **Logs** | Chronological event log viewer with refresh | Logs page |
+| **System tray** | Green/yellow/red traffic light icon, Open / Quit menu | Window close → hides to tray |
+| **Notifications** | Toast popups for kill/restart results | Auto-shown on action |
+| **Custom titlebar** | Minimize / maximize / close | Top of window (decorations disabled) |
+
+---
+
 ## Architecture
 
 ```
