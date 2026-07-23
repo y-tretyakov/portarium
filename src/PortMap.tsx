@@ -9,16 +9,26 @@ interface GraphNode extends d3.SimulationNodeDatum {
   pid: number;
   process_name: string;
   project_name: string | null;
+  cluster_id: string | null;
   framework: string | null;
   is_dev: boolean;
   connection_count: number;
 }
+
 interface GraphEdge extends d3.SimulationLinkDatum<GraphNode> {
   source: string | GraphNode;
   target: string | GraphNode;
   active: boolean;
+  edge_type: "tcp_connection" | "project_peer" | "orchestration_peer";
 }
-interface PortGraph { nodes: GraphNode[]; edges: GraphEdge[]; }
+
+interface PortCluster {
+  id: string;
+  label: string;
+  node_ids: string[];
+}
+
+interface PortGraph { nodes: GraphNode[]; edges: GraphEdge[]; clusters: PortCluster[]; }
 
 const FW_COLORS: Record<string, string> = {
   React:"#61dafb",Vite:"#646cff",Angular:"#dd0031",
@@ -35,12 +45,18 @@ function nodeR(n: GraphNode) {
   return n.is_dev ? 26 : 18;
 }
 
+const EDGE_STYLE: Record<string, { dash: string; width: number; opacity: number; glow: boolean; flow: boolean }> = {
+  tcp_connection:     { dash: "none",           width: 1.5, opacity: .65, glow: true,  flow: true },
+  project_peer:       { dash: "6 4",            width: 1,   opacity: .35, glow: false, flow: false },
+  orchestration_peer: { dash: "2 4",            width: .8,  opacity: .25, glow: false, flow: false },
+};
+
 export default function PortMap({ onClose }: { onClose: () => void }) {
   const svgRef   = useRef<SVGSVGElement>(null);
   const canvasRef= useRef<HTMLCanvasElement>(null);
   const simRef   = useRef<d3.Simulation<GraphNode,GraphEdge>|null>(null);
   const rafRef   = useRef<number>(0);
-  const [graph, setGraph]       = useState<PortGraph>({nodes:[],edges:[]});
+  const [graph, setGraph]       = useState<PortGraph>({nodes:[],edges:[],clusters:[]});
   const [selected, setSelected] = useState<GraphNode|null>(null);
   const [loading, setLoading]   = useState(true);
 
@@ -57,14 +73,11 @@ export default function PortMap({ onClose }: { onClose: () => void }) {
     } catch { } finally { setLoading(false); }
   }, []);
 
-  // Fetch once on mount, then listen for backend port-change events
   useEffect(() => {
     fetchGraph();
     let unlisten: (() => void) | null = null;
     import("@tauri-apps/api/event").then(({ listen }) => {
-      listen("ports-updated", () => {
-        fetchGraph();
-      }).then((fn) => { unlisten = fn; });
+      listen("ports-updated", () => { fetchGraph(); }).then((fn) => { unlisten = fn; });
     });
     return () => { if (unlisten) unlisten(); };
   }, [fetchGraph]);
@@ -133,7 +146,7 @@ export default function PortMap({ onClose }: { onClose: () => void }) {
 
     const defs = svg.append("defs");
 
-    // Arrow
+    // Arrow marker
     defs.append("marker").attr("id","arr").attr("viewBox","0 0 10 10")
       .attr("refX",32).attr("refY",5).attr("markerWidth",6).attr("markerHeight",6)
       .attr("orient","auto-start-reverse")
@@ -141,7 +154,14 @@ export default function PortMap({ onClose }: { onClose: () => void }) {
       .attr("stroke","rgba(124,111,255,0.5)").attr("stroke-width",1.5)
       .attr("stroke-linecap","round");
 
-    // Glow helper
+    // Secondary arrow for non-TCP edges
+    defs.append("marker").attr("id","arr-dim").attr("viewBox","0 0 10 10")
+      .attr("refX",28).attr("refY",5).attr("markerWidth",5).attr("markerHeight",5)
+      .attr("orient","auto-start-reverse")
+      .append("path").attr("d","M2 1L8 5L2 9").attr("fill","none")
+      .attr("stroke","rgba(124,111,255,0.2)").attr("stroke-width",1)
+      .attr("stroke-linecap","round");
+
     function glow(id: string, std: number, color: string) {
       const f = defs.append("filter").attr("id",id)
         .attr("x","-80%").attr("y","-80%").attr("width","260%").attr("height","260%");
@@ -156,8 +176,9 @@ export default function PortMap({ onClose }: { onClose: () => void }) {
     glow("glow-md",7,"rgba(124,111,255,0.5)");
     graph.nodes.forEach(n => glow(`gn-${n.id}`,5,nodeColor(n)));
 
-    // Edge gradients
-    graph.edges.forEach((e, i) => {
+    // Edge gradients — only for TCP edges
+    const tcpEdges = graph.edges.filter(e => e.edge_type === "tcp_connection");
+    tcpEdges.forEach((e, i) => {
       const s = graph.nodes.find(n=>n.id===(typeof e.source==="string"?e.source:(e.source as GraphNode).id));
       const t = graph.nodes.find(n=>n.id===(typeof e.target==="string"?e.target:(e.target as GraphNode).id));
       const sc = s ? nodeColor(s) : "#7c6fff";
@@ -178,42 +199,85 @@ export default function PortMap({ onClose }: { onClose: () => void }) {
       target: typeof e.target==="string" ? e.target : (e.target as GraphNode).id,
     }));
 
+    // Cluster grouping force
+    const clusterCenters = new Map<string, {x:number;y:number}>();
+    const clusters = graph.clusters;
+    if (clusters.length > 0) {
+      const angleStep = (2 * Math.PI) / clusters.length;
+      clusters.forEach((c, i) => {
+        const angle = angleStep * i - Math.PI / 2;
+        const radius = Math.min(W, H) * 0.3;
+        clusterCenters.set(c.id, {
+          x: W / 2 + Math.cos(angle) * radius,
+          y: H / 2 + Math.sin(angle) * radius,
+        });
+      });
+    }
+
     const sim = d3.forceSimulation<GraphNode>(simNodes)
       .force("link", d3.forceLink<GraphNode,GraphEdge>(simEdges)
         .id(d=>d.id).distance(140).strength(.45))
       .force("charge", d3.forceManyBody().strength(d=>(d as GraphNode).is_dev?-500:-280))
       .force("center", d3.forceCenter(W/2, H/2))
       .force("collide", d3.forceCollide<GraphNode>().radius(d=>nodeR(d)+28));
+
+    // Cluster force: pull nodes toward their cluster center
+    if (clusterCenters.size > 0) {
+      sim.force("cluster", (alpha: number) => {
+        for (const n of simNodes) {
+          if (!n.cluster_id) continue;
+          const center = clusterCenters.get(n.cluster_id);
+          if (!center) continue;
+          const strength = 0.08 * alpha;
+          n.vx = (n.vx || 0) + (center.x - (n.x || 0)) * strength;
+          n.vy = (n.vy || 0) + (center.y - (n.y || 0)) * strength;
+        }
+      });
+    }
+
     simRef.current = sim;
+
+    // Cluster background group (rendered before edges)
+    const clusterG = container.append("g").attr("class","cluster-bg");
 
     const edgeG = container.append("g");
 
-    // Dashed arc edges
-    const edgePaths = edgeG.selectAll<SVGPathElement,GraphEdge>(".ep")
-      .data(simEdges).enter().append("path")
+    // Edges split by type
+    const tcpSimEdges = simEdges.filter(e => e.edge_type === "tcp_connection");
+    const projSimEdges = simEdges.filter(e => e.edge_type !== "tcp_connection");
+
+    // TCP edges: gradient, animated flow
+    const tcpEdgePaths = edgeG.selectAll<SVGPathElement,GraphEdge>(".tep")
+      .data(tcpSimEdges).enter().append("path")
       .attr("fill","none")
       .attr("stroke",(_,i)=>`url(#eg${i})`)
       .attr("stroke-width",1.5)
-      .attr("stroke-dasharray","5 5")
       .attr("opacity",.65)
       .attr("marker-end","url(#arr)");
 
-    // Animated flow
-    const flowPaths = edgeG.selectAll<SVGPathElement,GraphEdge>(".fp")
-      .data(simEdges).enter().append("path")
+    const tcpFlowPaths = edgeG.selectAll<SVGPathElement,GraphEdge>(".tfp")
+      .data(tcpSimEdges).enter().append("path")
       .attr("fill","none")
       .attr("stroke","rgba(210,200,255,0.95)")
       .attr("stroke-width",2.5)
       .attr("stroke-dasharray","2 30");
 
-    // Glow overlay on edges
-    const glowPaths = edgeG.selectAll<SVGPathElement,GraphEdge>(".gp")
-      .data(simEdges).enter().append("path")
+    const tcpGlowPaths = edgeG.selectAll<SVGPathElement,GraphEdge>(".tgp")
+      .data(tcpSimEdges).enter().append("path")
       .attr("fill","none")
       .attr("stroke","rgba(124,111,255,0.25)")
       .attr("stroke-width",6)
-      .attr("stroke-dasharray","5 5")
       .attr("filter","url(#glow-sm)");
+
+    // Project / Orchestration edges: dashed, no flow
+    const projEdgePaths = edgeG.selectAll<SVGPathElement,GraphEdge>(".pep")
+      .data(projSimEdges).enter().append("path")
+      .attr("fill","none")
+      .attr("stroke","rgba(124,111,255,0.25)")
+      .attr("stroke-width",d=>EDGE_STYLE[d.edge_type]?.width ?? 1)
+      .attr("stroke-dasharray",d=>EDGE_STYLE[d.edge_type]?.dash ?? "6 4")
+      .attr("opacity",d=>EDGE_STYLE[d.edge_type]?.opacity ?? .35)
+      .attr("marker-end","url(#arr-dim)");
 
     function arcPath(s: GraphNode, t: GraphNode) {
       const dx=(t.x||0)-(s.x||0), dy=(t.y||0)-(s.y||0);
@@ -310,19 +374,23 @@ export default function PortMap({ onClose }: { onClose: () => void }) {
 
     // Tick
     sim.on("tick",()=>{
+      const bounds = computeClusterBounds(simNodes);
+      renderClusterBounds(clusterG, bounds, clusters);
+
       const path=(d: GraphEdge)=>arcPath(d.source as GraphNode, d.target as GraphNode);
-      edgePaths.attr("d",path);
-      flowPaths.attr("d",path);
-      glowPaths.attr("d",path);
+      tcpEdgePaths.attr("d",path);
+      tcpFlowPaths.attr("d",path);
+      tcpGlowPaths.attr("d",path);
+      projEdgePaths.attr("d",path);
       nodeGs.attr("transform",d=>`translate(${d.x||0},${d.y||0})`);
     });
 
-    // Animate flow
+    // Animate flow on TCP edges only
     let off=0;
     function anim(){
       off-=.9;
-      flowPaths.attr("stroke-dashoffset",off);
-      glowPaths.attr("stroke-dashoffset",off*.5);
+      tcpFlowPaths.attr("stroke-dashoffset",off);
+      tcpGlowPaths.attr("stroke-dashoffset",off*.5);
       rafRef.current=requestAnimationFrame(anim);
     }
     anim();
@@ -352,6 +420,8 @@ export default function PortMap({ onClose }: { onClose: () => void }) {
       .attr("fill",d=>selected?.id===d.id?`${nodeColor(d)}35`:`${nodeColor(d)}1a`);
   },[selected]);
 
+  const clusterCount = graph.clusters.length;
+
   return (
     <div className="pm-wrap">
       <canvas ref={canvasRef} className="pm-bg" />
@@ -364,6 +434,7 @@ export default function PortMap({ onClose }: { onClose: () => void }) {
             <div className="pm-title">PORT MAP</div>
             <div className="pm-sub">
               {graph.nodes.length} nodes · {graph.edges.length} connections
+              {clusterCount > 0 && ` · ${clusterCount} clusters`}
             </div>
           </div>
         </div>
@@ -418,6 +489,9 @@ export default function PortMap({ onClose }: { onClose: () => void }) {
               {selected.framework}
             </span>
           )}
+          {selected.cluster_id && (
+            <div className="pmi-row"><span>Cluster</span><span>{selected.cluster_id}</span></div>
+          )}
           <div className="pmi-row"><span>PID</span><span>{selected.pid}</span></div>
           <div className="pmi-row"><span>Process</span><span>{selected.process_name}</span></div>
           <div className="pmi-row"><span>Connections</span><span>{selected.connection_count}</span></div>
@@ -439,9 +513,69 @@ export default function PortMap({ onClose }: { onClose: () => void }) {
                 {l}
               </div>
             ))}
+          <div className="pm-leg-sep" />
+          <div className="pm-leg-item">
+            <svg width="14" height="4" viewBox="0 0 14 4"><line x1="0" y1="2" x2="14" y2="2" stroke="rgba(124,111,255,0.5)" strokeWidth="1.5"/></svg>
+            TCP
+          </div>
+          <div className="pm-leg-item">
+            <svg width="14" height="4" viewBox="0 0 14 4"><line x1="0" y1="2" x2="14" y2="2" stroke="rgba(124,111,255,0.25)" strokeWidth="1" strokeDasharray="4 4"/></svg>
+            Project
+          </div>
         </div>
         <span className="pm-leg-txt">DRAG · SCROLL TO ZOOM · CLICK TO INSPECT</span>
       </div>
     </div>
   );
+}
+
+function computeClusterBounds(nodes: GraphNode[]): Map<string, {x:number;y:number;w:number;h:number}> {
+  const groups = new Map<string, {xs:number[];ys:number[]}>();
+  for (const n of nodes) {
+    if (!n.cluster_id) continue;
+    if (!groups.has(n.cluster_id)) groups.set(n.cluster_id, {xs:[],ys:[]});
+    const g = groups.get(n.cluster_id)!;
+    g.xs.push(n.x || 0);
+    g.ys.push(n.y || 0);
+  }
+  const pad = 60;
+  const result = new Map<string, {x:number;y:number;w:number;h:number}>();
+  for (const [id, g] of groups) {
+    const minX = Math.min(...g.xs);
+    const maxX = Math.max(...g.xs);
+    const minY = Math.min(...g.ys);
+    const maxY = Math.max(...g.ys);
+    result.set(id, {
+      x: minX - pad,
+      y: minY - pad - 14,
+      w: maxX - minX + pad * 2,
+      h: maxY - minY + pad * 2 + 14,
+    });
+  }
+  return result;
+}
+
+function renderClusterBounds(g: d3.Selection<SVGGElement, unknown, null, undefined>, bounds: Map<string, {x:number;y:number;w:number;h:number}>, clusters: PortCluster[]) {
+  g.selectAll(".cluster-box").remove();
+  for (const c of clusters) {
+    const b = bounds.get(c.id);
+    if (!b) continue;
+    const grp = g.append("g").attr("class","cluster-box");
+    grp.append("rect")
+      .attr("x",b.x).attr("y",b.y)
+      .attr("width",b.w).attr("height",b.h)
+      .attr("rx",12).attr("ry",12)
+      .attr("fill","rgba(124,111,255,0.03)")
+      .attr("stroke","rgba(124,111,255,0.12)")
+      .attr("stroke-width",1)
+      .attr("stroke-dasharray","4 4");
+    grp.append("text")
+      .attr("x",b.x + 10).attr("y",b.y + 14)
+      .attr("font-family","system-ui")
+      .attr("font-size","9")
+      .attr("font-weight","600")
+      .attr("fill","rgba(124,111,255,0.4)")
+      .attr("letter-spacing","0.05em")
+      .text(c.label);
+  }
 }

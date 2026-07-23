@@ -1,6 +1,6 @@
 {
   "name": "portarium",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "type": "module",
   "description": "Desktop app frontend for Portarium — developer port manager",
   "private": true,

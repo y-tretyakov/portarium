@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::config::PortariumConfig;
 use crate::error::Result;
 use crate::frameworks;
-use crate::graph;
+use crate::graph_builder::GraphBuilder;
 use crate::logger::PortLogger;
 use crate::models::{PortEvent, PortGraph, PortInfo, TrafficSample};
 use crate::scanner::PortScanner;
@@ -34,19 +34,7 @@ impl PortariumService {
             })
             .collect();
 
-        let listening: Vec<(u16, u32, String, Option<String>)> = ports
-            .iter()
-            .map(|p| {
-                (
-                    p.port,
-                    p.pid,
-                    p.process_name.clone(),
-                    p.project_name.clone(),
-                )
-            })
-            .collect();
-
-        let graph = graph::build_port_graph(&listening);
+        let graph = GraphBuilder::build(&ports);
         let mut conn_counts = HashMap::new();
         for node in &graph.nodes {
             conn_counts.insert(node.port, node.connection_count);
@@ -73,18 +61,7 @@ impl PortariumService {
 
     pub fn get_graph(&mut self) -> Result<PortGraph> {
         let ports = self.scanner.scan()?;
-        let listening: Vec<(u16, u32, String, Option<String>)> = ports
-            .iter()
-            .map(|p| {
-                (
-                    p.port,
-                    p.pid,
-                    p.process_name.clone(),
-                    p.project_name.clone(),
-                )
-            })
-            .collect();
-        Ok(graph::build_port_graph(&listening))
+        Ok(GraphBuilder::build(&ports))
     }
 
     pub fn kill(&self, pid: u32) -> Result<()> {

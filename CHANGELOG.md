@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.6.3] — 2026-07-23
+
+### Added
+- Smart graph builder with strategy pattern (TCP + Project + Orchestration)
+- Project grouping: nodes sharing a project are connected with `ProjectPeer` edges
+- Docker Compose awareness: detects `com.docker.compose.project` labels from `docker inspect` and `docker ps`
+- Cluster visualization: project-grouped nodes enclosed in dashed bounding boxes
+- Three edge types: solid animated (TCP), dashed (project), dotted (orchestration)
+
+### Changed
+- `PortGraph` now includes `clusters` and typed `GraphEdge.edge_type` field
+- Scanner integrates Docker port-to-project matching on Linux
+- Frontend PortMap distinguishes edge types visually with legend
+
 ## [0.6.2] — 2026-07-23
 
 ### Added

@@ -209,3 +209,8 @@
   font-size: 9px; color: rgba(255,255,255,.15);
   font-family: 'JetBrains Mono', monospace; letter-spacing:.06em;
 }
+.pm-leg-sep {
+  width: 1px; height: 12px;
+  background: rgba(255,255,255,.08);
+  align-self: center;
+}

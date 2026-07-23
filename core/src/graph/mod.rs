@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::process::Command;
 
 use crate::frameworks;
-use crate::models::{GraphEdge, GraphNode, PortGraph};
+use crate::models::{EdgeType, GraphEdge, GraphNode, PortGraph};
 
 type ListeningEntry = (u16, u32, String, Option<String>);
 
@@ -11,6 +11,7 @@ pub fn build_port_graph(listening: &[ListeningEntry]) -> PortGraph {
 
     let mut node_map: HashMap<u16, GraphNode> = HashMap::new();
     for (port, pid, process_name, project_name) in listening {
+        let cluster_id = project_name.clone();
         node_map.insert(
             *port,
             GraphNode {
@@ -19,6 +20,7 @@ pub fn build_port_graph(listening: &[ListeningEntry]) -> PortGraph {
                 pid: *pid,
                 process_name: process_name.clone(),
                 project_name: project_name.clone(),
+                cluster_id,
                 framework: frameworks::get_framework(*port),
                 is_dev: frameworks::is_dev_port(*port),
                 connection_count: 0,
@@ -69,10 +71,30 @@ pub fn build_port_graph(listening: &[ListeningEntry]) -> PortGraph {
         }
     }
 
+    let clusters = build_clusters(&node_map);
+
     PortGraph {
         nodes: node_map.into_values().collect(),
         edges,
+        clusters,
     }
+}
+
+fn build_clusters(node_map: &HashMap<u16, GraphNode>) -> Vec<crate::models::PortCluster> {
+    let mut cluster_map: std::collections::BTreeMap<String, Vec<String>> = std::collections::BTreeMap::new();
+    for node in node_map.values() {
+        if let Some(ref cid) = node.cluster_id {
+            cluster_map.entry(cid.clone()).or_default().push(node.id.clone());
+        }
+    }
+    cluster_map
+        .into_iter()
+        .map(|(id, node_ids)| crate::models::PortCluster {
+            label: id.clone(),
+            node_ids,
+            id,
+        })
+        .collect()
 }
 
 fn add_edge(
@@ -88,6 +110,7 @@ fn add_edge(
             source: format!("port:{a}"),
             target: format!("port:{b}"),
             active: true,
+            edge_type: EdgeType::TcpConnection,
         });
         if let Some(n) = node_map.get_mut(&a) {
             n.connection_count += 1;

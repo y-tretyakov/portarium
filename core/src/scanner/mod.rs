@@ -34,6 +34,18 @@ impl ScannerBackend for UnixScanner {
         let tcp_ports = scan_proc_net_tcp(sys, &mut seen)?;
         ports.extend(tcp_ports);
 
+        // 3. Match Docker ports to Compose projects
+        let port_pids: Vec<(u16, u32)> = ports.iter().map(|p| (p.port, p.pid)).collect();
+        let docker_projects = match_docker_ports_to_project(&port_pids);
+        for p in &mut ports {
+            if p.project_name.is_none() {
+                if let Some(project) = docker_projects.get(&p.port) {
+                    p.project_name = Some(project.clone());
+                    p.project_path = Some(format!("/docker/compose/{project}"));
+                }
+            }
+        }
+
         ports.sort_by_key(|p| p.port);
         Ok(ports)
     }
@@ -324,7 +336,132 @@ fn get_process_info(sys: &mut System, pid: u32) -> (Option<String>, Option<Strin
         project_path = get_project_path_unix_fallback(pid);
     }
 
+    // If no project found via cwd, try Docker container labels
+    if project_path.is_none() {
+        if let Some(compose_project) = detect_docker_compose_for_pid(pid) {
+            project_path = Some(format!("/docker/compose/{compose_project}"));
+        }
+    }
+
     (project_path, start_cmd)
+}
+
+/// Detect if a process belongs to a Docker Compose project by checking
+/// `/proc/<pid>/cgroup` and then matching with `docker inspect`.
+#[cfg(target_os = "linux")]
+fn detect_docker_compose_for_pid(pid: u32) -> Option<String> {
+    // Read /proc/<pid>/cgroup to get container ID
+    let cgroup_path = format!("/proc/{pid}/cgroup");
+    let cgroup = std::fs::read_to_string(&cgroup_path).ok()?;
+
+    // Extract container ID from cgroup entries like:
+    // 1:name=systemd:/docker/<container_id>
+    // 0::/system.slice/docker-<container_id>.scope
+    let container_id = cgroup
+        .lines()
+        .filter_map(|line| {
+            if let Some(suffix) = line.rsplit('/').next() {
+                if suffix.len() == 64 && suffix.chars().all(|c| c.is_ascii_hexdigit()) {
+                    return Some(suffix.to_string());
+                }
+                // Also handle docker-<id>.scope format
+                if let Some(rest) = suffix.strip_prefix("docker-") {
+                    if let Some(id) = rest.strip_suffix(".scope") {
+                        if id.len() == 64 && id.chars().all(|c| c.is_ascii_hexdigit()) {
+                            return Some(id.to_string());
+                        }
+                    }
+                }
+            }
+            None
+        })
+        .next()?;
+
+    // Try docker inspect to get labels (truncated container ID is often sufficient)
+    let output = std::process::Command::new("docker")
+        .args([
+            "inspect",
+            &container_id,
+            "--format",
+            "{{.Config.Labels}}",
+        ])
+        .output()
+        .ok()?;
+
+    let labels = String::from_utf8_lossy(&output.stdout);
+    for part in labels.split_whitespace() {
+        if let Some(project) = part.strip_prefix("com.docker.compose.project:") {
+            let project = project.trim_matches(',');
+            if !project.is_empty() {
+                return Some(project.to_string());
+            }
+        }
+    }
+
+    None
+}
+
+#[cfg(not(target_os = "linux"))]
+fn detect_docker_compose_for_pid(_pid: u32) -> Option<String> {
+    None
+}
+
+/// Try to detect Docker Compose project by running `docker ps` and matching
+/// exposed ports to local listening ports.
+#[cfg(target_os = "linux")]
+pub(crate) fn match_docker_ports_to_project(ports: &[(u16, u32)]) -> HashMap<u16, String> {
+    use std::collections::HashMap;
+
+    let mut result = HashMap::new();
+
+    let output = match std::process::Command::new("docker")
+        .args([
+            "ps",
+            "--format",
+            "{{.ID}}\t{{.Ports}}\t{{.Label \"com.docker.compose.project\"}}",
+        ])
+        .output()
+    {
+        Ok(o) => o,
+        Err(_) => return result,
+    };
+
+    if !output.status.success() {
+        return result;
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    for line in stdout.lines() {
+        let mut parts = line.splitn(3, '\t');
+        let _id = match parts.next() { Some(id) => id, None => continue };
+        let port_str = match parts.next() { Some(s) => s, None => continue };
+        let project = parts.next().unwrap_or("");
+
+        if project.is_empty() {
+            continue;
+        }
+
+        // Parse port mappings like "0.0.0.0:5432->5432/tcp"
+        for mapping in port_str.split(',') {
+            let mapping = mapping.trim();
+            if let Some(host_part) = mapping.split("->").next() {
+                if let Some(host_port) = host_part.rsplit(':').next() {
+                    if let Ok(port) = host_port.parse::<u16>() {
+                        if ports.iter().any(|(p, _)| *p == port) {
+                            result.entry(port).or_insert_with(|| project.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    result
+}
+
+#[cfg(not(target_os = "linux"))]
+pub(crate) fn match_docker_ports_to_project(_ports: &[(u16, u32)]) -> HashMap<u16, String> {
+    HashMap::new()
 }
 
 #[cfg(target_os = "windows")]

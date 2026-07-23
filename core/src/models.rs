@@ -42,9 +42,19 @@ pub struct GraphNode {
     pub pid: u32,
     pub process_name: String,
     pub project_name: Option<String>,
+    pub cluster_id: Option<String>,
     pub framework: Option<String>,
     pub is_dev: bool,
     pub connection_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum EdgeType {
+    #[default]
+    TcpConnection,
+    ProjectPeer,
+    OrchestrationPeer,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,12 +62,23 @@ pub struct GraphEdge {
     pub source: String,
     pub target: String,
     pub active: bool,
+    #[serde(default)]
+    pub edge_type: EdgeType,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PortCluster {
+    pub id: String,
+    pub label: String,
+    pub node_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PortGraph {
     pub nodes: Vec<GraphNode>,
     pub edges: Vec<GraphEdge>,
+    #[serde(default)]
+    pub clusters: Vec<PortCluster>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -161,6 +182,7 @@ mod tests {
             pid: 1234,
             process_name: "node".into(),
             project_name: Some("my-app".into()),
+            cluster_id: Some("my-app".into()),
             framework: Some("React".into()),
             is_dev: true,
             connection_count: 5,
@@ -175,6 +197,7 @@ mod tests {
             source: "port:3000".into(),
             target: "port:5432".into(),
             active: true,
+            edge_type: EdgeType::TcpConnection,
         };
         assert_eq!(edge.source, "port:3000");
         assert!(edge.active);
@@ -185,9 +208,11 @@ mod tests {
         let graph = PortGraph {
             nodes: vec![],
             edges: vec![],
+            clusters: vec![],
         };
         assert!(graph.nodes.is_empty());
         assert!(graph.edges.is_empty());
+        assert!(graph.clusters.is_empty());
     }
 
     #[test]
