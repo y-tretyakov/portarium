@@ -53,7 +53,7 @@ jobs:
           cache: npm
 
       - name: Install JS deps
-        run: npm ci
+        run: npm install
 
       - name: Build Tauri desktop app
         run: npm run tauri build
