@@ -33,9 +33,20 @@ src-tauri/errors.json
 # Old OpenTUI app (will be removed after Stage 2)
 portarium-tui
 
-# Agent files (except CHANGELOG)
+# Agent / planning files
 .agents/
 AGENTS.md
 skills-lock.json
-docs/portarium-analysis.md
+
+# Internal docs (not for distribution)
+docs/ADR-001-Core-Extraction.md
+docs/ADR-002-Ratatui-Migration.md
+docs/AGENTS.md
+docs/CODING_STANDARDS.md
+docs/DEVELOPMENT_FLOW.md
+docs/PLAN.md
 docs/PROMPT.md
+docs/STATUS.md
+docs/SUBAGENT_PROMPTS.md
+docs/portarium-analysis.md
+docs/tmp.md

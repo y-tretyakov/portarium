@@ -25,13 +25,39 @@ tauri:
 
 # ── Test ───────────────────────────────────────────────────────────────────────
 
-# Run all tests
+# Run all tests (unit + integration)
 test:
     cargo test --workspace
 
 # Test only core
 test-core:
     cargo test -p portarium-core
+
+# Test only TUI
+test-tui:
+    cargo test -p portarium-tui
+
+# Test only CLI
+test-cli:
+    cargo test -p portarium-cli
+
+# Run tests with output
+test-verbose:
+    cargo test --workspace -- --nocapture
+
+# ── Coverage ───────────────────────────────────────────────────────────────────
+
+# Install coverage tool
+cov-install:
+    cargo install cargo-llvm-cov
+
+# Run coverage (HTML report)
+cov-html:
+    cargo llvm-cov --html
+
+# Run coverage (LCOV for CI)
+cov-lcov:
+    cargo llvm-cov --lcov --output-path lcov.info
 
 # ── Lint / Format ──────────────────────────────────────────────────────────────
 

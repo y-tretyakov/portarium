@@ -101,3 +101,114 @@ fn map_key(key: KeyEvent) -> Option<Action> {
         _ => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::KeyCode;
+
+    #[test]
+    fn map_key_quit_q() {
+        let key = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE);
+        assert!(matches!(map_key(key), Some(Action::Quit)));
+    }
+
+    #[test]
+    fn map_key_quit_ctrl_c() {
+        let key = KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL);
+        assert!(matches!(map_key(key), Some(Action::Quit)));
+    }
+
+    #[test]
+    fn map_key_navigate_up() {
+        let key = KeyEvent::new(KeyCode::Up, KeyModifiers::NONE);
+        assert!(matches!(map_key(key), Some(Action::SelectUp)));
+    }
+
+    #[test]
+    fn map_key_navigate_down_k() {
+        let key = KeyEvent::new(KeyCode::Char('k'), KeyModifiers::NONE);
+        assert!(matches!(map_key(key), Some(Action::SelectUp)));
+    }
+
+    #[test]
+    fn map_key_navigate_down() {
+        let key = KeyEvent::new(KeyCode::Down, KeyModifiers::NONE);
+        assert!(matches!(map_key(key), Some(Action::SelectDown)));
+    }
+
+    #[test]
+    fn map_key_navigate_down_j() {
+        let key = KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE);
+        assert!(matches!(map_key(key), Some(Action::SelectDown)));
+    }
+
+    #[test]
+    fn map_key_enter() {
+        let key = KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE);
+        assert!(matches!(map_key(key), Some(Action::Enter)));
+    }
+
+    #[test]
+    fn map_key_back_esc() {
+        let key = KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE);
+        assert!(matches!(map_key(key), Some(Action::Back)));
+    }
+
+    #[test]
+    fn map_key_back_backspace() {
+        let key = KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE);
+        assert!(matches!(map_key(key), Some(Action::Back)));
+    }
+
+    #[test]
+    fn map_key_toggle_help() {
+        let key = KeyEvent::new(KeyCode::Char('?'), KeyModifiers::NONE);
+        assert!(matches!(map_key(key), Some(Action::ToggleHelp)));
+    }
+
+    #[test]
+    fn map_key_screen_dashboard() {
+        let key = KeyEvent::new(KeyCode::Char('1'), KeyModifiers::NONE);
+        assert!(matches!(
+            map_key(key),
+            Some(Action::ChangeScreen(Screen::Dashboard))
+        ));
+    }
+
+    #[test]
+    fn map_key_screen_detail() {
+        let key = KeyEvent::new(KeyCode::Char('2'), KeyModifiers::NONE);
+        assert!(matches!(
+            map_key(key),
+            Some(Action::ChangeScreen(Screen::Detail))
+        ));
+    }
+
+    #[test]
+    fn map_key_screen_graph() {
+        let key = KeyEvent::new(KeyCode::Char('3'), KeyModifiers::NONE);
+        assert!(matches!(
+            map_key(key),
+            Some(Action::ChangeScreen(Screen::Graph))
+        ));
+    }
+
+    #[test]
+    fn map_key_scan() {
+        let key = KeyEvent::new(KeyCode::Char('r'), KeyModifiers::NONE);
+        assert!(matches!(map_key(key), Some(Action::Scan)));
+    }
+
+    #[test]
+    fn map_key_unknown_returns_none() {
+        let key = KeyEvent::new(KeyCode::F(1), KeyModifiers::NONE);
+        assert!(map_key(key).is_none());
+    }
+
+    #[test]
+    fn map_key_unmodified_c_returns_none() {
+        let key = KeyEvent::new(KeyCode::Char('c'), KeyModifiers::NONE);
+        assert!(map_key(key).is_none());
+    }
+}

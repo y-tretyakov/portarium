@@ -1,0 +1,32 @@
+name: Release
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build CLI
+        run: cargo build -p portarium --release
+
+      - name: Build TUI
+        run: cargo build -p portarium-tui --release
+
+      - name: Upload artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            target/release/portarium${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+            target/release/portarium-tui${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+          generate_release_notes: true

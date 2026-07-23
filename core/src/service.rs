@@ -133,6 +133,12 @@ mod tests {
     }
 
     #[test]
+    fn service_get_all_traffic_empty_initially() {
+        let service = PortariumService::default();
+        assert!(service.get_all_traffic().is_empty());
+    }
+
+    #[test]
     fn service_log_conflict() {
         let mut service = PortariumService::default();
         let event = service.log_conflict(3000, 1234, "node");
@@ -141,5 +147,32 @@ mod tests {
         let events = service.get_events();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].port, 3000);
+    }
+
+    #[test]
+    fn service_log_multiple_conflicts() {
+        let mut service = PortariumService::default();
+        service.log_conflict(3000, 1234, "node");
+        service.log_conflict(3001, 5678, "python");
+        let events = service.get_events();
+        assert_eq!(events.len(), 2);
+    }
+
+    #[test]
+    fn service_config_reflects_constructor() {
+        let mut config = PortariumConfig::default();
+        config.scanner.poll_interval_secs = 10;
+        let service = PortariumService::new(config);
+        assert_eq!(service.config().scanner.poll_interval_secs, 10);
+    }
+
+    #[test]
+    fn service_get_events_returns_newest_first() {
+        let mut service = PortariumService::default();
+        service.log_conflict(3000, 1234, "node");
+        service.log_conflict(3001, 5678, "python");
+        let events = service.get_events();
+        assert_eq!(events[0].port, 3001);
+        assert_eq!(events[1].port, 3000);
     }
 }

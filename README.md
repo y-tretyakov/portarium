@@ -6,7 +6,7 @@
 
 **Know what's running. Kill what's blocking. See how it's connected.**
 
-A blazing-fast, native developer port manager. Stop playing detective with `netstat` and `lsof`. Portarium watches your ports, tracks traffic, and visualizes network topology — across desktop and terminal.
+A blazing-fast, native developer port manager. Stop playing detective with `netstat` and `lsof`. Portarium watches your ports, tracks traffic, and visualizes network topology — in your terminal, CLI, or desktop.
 
 [![Windows](https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/y-tretyakov/portarium/releases)
 [![macOS](https://img.shields.io/badge/macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/y-tretyakov/portarium/releases)
@@ -14,78 +14,59 @@ A blazing-fast, native developer port manager. Stop playing detective with `nets
 [![Built with Tauri](https://img.shields.io/badge/Desktop-Tauri_2-FFC131?style=for-the-badge&logo=tauri&logoColor=white)](https://tauri.app)
 [![Terminal UI](https://img.shields.io/badge/Terminal-Ratatui-7c6fff?style=for-the-badge)](https://ratatui.rs)
 [![npm](https://img.shields.io/npm/v/portarium?style=for-the-badge&logo=npm&label=npm)](https://www.npmjs.com/package/portarium)
+[![Crates.io](https://img.shields.io/crates/v/portarium-core?style=for-the-badge&logo=rust&label=crates.io)](https://crates.io/crates/portarium-core)
+[![CI](https://img.shields.io/github/actions/workflow/status/y-tretyakov/portarium/ci.yml?style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/y-tretyakov/portarium/actions/workflows/ci.yml)
 [![Stars](https://img.shields.io/github/stars/y-tretyakov/portarium?style=social)](https://github.com/y-tretyakov/portarium)
-
-![Portarium App Interaction Demo](https://raw.githubusercontent.com/y-tretyakov/portarium/main/assets/gif.gif)
 
 </div>
 
 ---
 
-## 🚀 Quick Start
-
-### Terminal UI
-
-```bash
-cargo run -p portarium-tui
-```
-
-### Desktop App
-
-Download from [GitHub Releases](https://github.com/y-tretyakov/portarium/releases).
-
----
-
-## 🤔 The Problem
-
-Every developer knows the pain:
+## The Problem
 
 ```text
 Error: listen EADDRINUSE: address already in use :::3000
 ```
 
-You open a project and *something* is already squatting on the port. Now you're hunting for PIDs and copy-pasting kill commands. Every. Single. Time.
+Something is already squatting on your port. You hunt for PIDs, copy-paste kill commands, and lose focus. Every. Single. Time.
 
 **Portarium ends that.**
 
 ---
 
-## ✨ Features
+## Features
 
-### 🔍 Real-Time Port Dashboard
-See every listening port on your machine at a glance — process name, PID, connections, framework detection, and project identification.
+### Real-Time Port Dashboard
+Every listening port at a glance — process name, PID, connections, framework detection, and project identification.
 
-### ⚡ One-Click Control
-Hover over any port and click **✕** to kill it instantly. If Portarium knows the start command, hit **↻** to restart it directly in a new terminal. Dead processes show a "stopped" badge with a persistent restart button.
+### One-Click Control
+Kill any process instantly. If the start command is known, restart it directly in a new terminal. Dead processes show a stopped badge with a persistent restart button.
 
-### 🗺️ Interactive Port Map (D3.js Topology)
-A D3.js-powered network topology visualization that shows precisely how your services are communicating.
+### Terminal UI (Beta)
+A full keyboard-driven Ratatui interface — no desktop shell required. Perfect for SSH sessions and developers who live in the terminal.
 
-<div align="center">
-![Port Map — Interactive Network Topology](https://raw.githubusercontent.com/y-tretyakov/portarium/main/assets/portmap.png)
-</div>
+### Interactive Port Map (Desktop)
+A D3.js-powered network topology visualization showing how your services communicate. Drag, zoom, and explore.
 
-- **Drag & Collide** simulation for physical manipulation
-- **Scroll** to zoom in and navigate
-- **Node Caching & Real-time updates** without screen flickering
-- **Framework-colored nodes** and connection metrics
+### System Tray Intelligence (Desktop)
+Lives quietly in your system tray. A traffic light icon alerts you to conflicts. Background logging keeps working when the window is closed.
 
-### 🔔 System Tray Intelligence
-Portarium lives quietly in your system tray:
-- **Traffic light icon** immediately alerts you to conflicts and statuses
-- A background thread quietly builds a historical log of all backend activity while the window is closed
-
-### 🧠 Smart Detection Engine
+### Smart Detection Engine
 - **Framework Detection** — Recognizes React, Vite, Angular, Django, Node, and more via default ports.
-- **Project Context** — Crawls for `package.json`, `Cargo.toml`, or `go.mod` to name your running servers.
+- **Project Context** — Crawls for `package.json`, `Cargo.tomr`, or `go.mod` to name your running servers.
+
+### CLI
+Full-featured command-line interface for scripts, pipelines, and headless environments.
 
 ---
 
-## 🖥️ Terminal UI (Ratatui)
+## Terminal UI (Beta)
 
-Portarium ships with a full keyboard-driven terminal interface built on [Ratatui](https://ratatui.rs). Same port dashboard, no desktop shell required — perfect for SSH sessions, minimal setups, or developers who live in the terminal.
+Portarium ships with a keyboard-driven terminal interface built on [Ratatui](https://ratatui.rs).
 
-### Four-Page Dashboard
+> **Status:** Beta — actively developed. Core functionality is stable, some visual polish is ongoing.
+
+### Pages
 
 | Page | Key | Description |
 |------|-----|-------------|
@@ -98,7 +79,7 @@ Portarium ships with a full keyboard-driven terminal interface built on [Ratatui
 
 | Key | Action |
 |-----|--------|
-| `↑` `↓` / `j` | Navigate port list |
+| `↑` `↓` / `j` `k` | Navigate port list |
 | `k` | Kill selected process |
 | `K` | Kill all filtered processes |
 | `r` | Restart selected (when start command is known) |
@@ -110,63 +91,15 @@ Portarium ships with a full keyboard-driven terminal interface built on [Ratatui
 
 ---
 
-## 📥 Installation
+## Installation
 
-### Terminal UI (from source)
-
-```bash
-cargo run -p portarium-tui
-```
-
-### CLI
-
-```bash
-cargo run -p portarium-cli -- list
-```
-
-### Desktop App
-
-<table>
-<tr>
-<td align="center"><b>🪟 Windows</b></td>
-<td align="center"><b>🍎 macOS</b></td>
-<td align="center"><b>🐧 Linux</b></td>
-</tr>
-<tr>
-<td align="center">
-<a href="https://github.com/y-tretyakov/portarium/releases/latest"><code>.msi</code> installer</a><br/>
-<a href="https://github.com/y-tretyakov/portarium/releases/latest"><code>.exe</code> setup</a>
-</td>
-<td align="center">
-<a href="https://github.com/y-tretyakov/portarium/releases/latest"><code>.dmg</code> Apple Silicon</a><br/>
-<a href="https://github.com/y-tretyakov/portarium/releases/latest"><code>.dmg</code> Intel</a>
-</td>
-<td align="center">
-<a href="https://github.com/y-tretyakov/portarium/releases/latest"><code>.deb</code> / <code>.AppImage</code></a>
-</td>
-</tr>
-</table>
-
-### Build from Source
+### From Source
 
 #### Prerequisites
 
 | Tool | Version | Install |
 |------|---------|---------|
 | **Rust** | ≥ 1.75 | [rustup.rs](https://rustup.rs) |
-| **Tauri CLI** | v2 | Included |
-
-#### Desktop App
-
-```bash
-git clone https://github.com/y-tretyakov/portarium.git
-cd portarium
-
-npm install
-npm run tauri dev
-```
-
-> The app launches with Vite HMR — edit React components and see changes instantly alongside the Rust backend watcher.
 
 #### Terminal UI
 
@@ -181,11 +114,27 @@ cargo run -p portarium-cli -- list
 cargo run -p portarium-cli -- watch
 cargo run -p portarium-cli -- events
 cargo run -p portarium-cli -- graph
+cargo run -p portarium-cli -- traffic
+cargo run -p portarium-cli -- kill <pid>
+cargo run -p portarium-cli -- restart <pid>
 ```
+
+#### Desktop App
+
+```bash
+git clone https://github.com/y-tretyakov/portarium.git
+cd portarium
+npm install
+npm run tauri dev
+```
+
+### Pre-built Binaries
+
+Download from [GitHub Releases](https://github.com/y-tretyakov/portarium/releases).
 
 ---
 
-## 🎯 Supported Frameworks
+## Supported Frameworks
 
 Portarium auto-detects these frameworks out-of-the-box:
 
@@ -209,41 +158,52 @@ Portarium auto-detects these frameworks out-of-the-box:
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
-| Layer | Technology |
-|-------|-----------|
-| **Runtime (desktop)** | [Tauri 2](https://tauri.app) — Rust backend, native webview |
-| **Frontend (desktop)** | React 19 + TypeScript + Vite 7 |
-| **Frontend (terminal)** | [Ratatui](https://ratatui.rs) — `tui/` |
-| **Visualization** | D3.js v7 — Force-directed graph simulation (desktop) |
-| **Styling** | Vanilla CSS — Custom Glassmorphism (desktop) |
-| **Port Engine** | `lsof`/`netstat` on Linux/macOS; `netstat` + `tasklist` on Windows |
-| **Data Pipelines** | Singleton thread-safe event logger in Rust (desktop) |
+```
+portarium/
+├── core/       # Rust library — all business logic (models, scanner, logger, graph, frameworks)
+├── tui/        # Ratatui terminal application
+├── cli/        # Clap CLI binary
+├── src-tauri/  # Tauri v2 desktop application
+└── src/        # React 19 + Vite 7 frontend (desktop only)
+```
 
----
-
-## 🤝 Contributing
-
-Contributions are warmly welcomed.
-
-1. **Fork** the repository
-2. **Create** a feature branch: `git checkout -b feat/amazing-feature`
-3. **Commit** your changes: `git commit -m 'Add amazing feature'`
-4. **Push** to the branch: `git push origin feat/amazing-feature`
-5. **Open** a Pull Request
-
-### Roadmap & Ideas
-- 🌐 Expanding supported framework signatures
-- 🎨 Theme customization & light mode support
-- 📦 Homebrew/Winget packages
-- 🧪 Expanding unit and integration tests
+All data is collected in-process via system commands (`lsof`/`ss`/`netstat`) and `/proc`. No external services, daemons, or network connections required.
 
 ---
 
-## 📄 License
+## Development
 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+```bash
+# Build everything
+cargo build
+
+# Run tests
+cargo test
+
+# Lint
+cargo clippy && cargo fmt --check
+
+# Full CI pipeline
+just ci
+```
+
+---
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feat/my-feature`
+3. Commit your changes
+4. Push to the branch
+5. Open a Pull Request
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
 
 ---
 
@@ -251,6 +211,6 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 **If Portarium saved you from one more `EADDRINUSE`, give it a ⭐**
 
-Made with 🦀 Rust + ⚛️ React + ⬛ Ratatui + 💜 by [y-tretyakov](https://github.com/y-tretyakov)
+Made with Rust + React + Ratatui by [y-tretyakov](https://github.com/y-tretyakov)
 
 </div>

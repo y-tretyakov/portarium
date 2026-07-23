@@ -299,4 +299,41 @@ mod tests {
             assert_eq!(node.id, format!("port:{}", node.port));
         }
     }
+
+    #[test]
+    fn build_graph_duplicate_ports_deduped() {
+        let listening = vec![
+            make_entry(3000, 1234, "node", None),
+            make_entry(3000, 1234, "node", None),
+        ];
+        let graph = build_port_graph(&listening);
+        assert_eq!(graph.nodes.len(), 1);
+    }
+
+    #[test]
+    fn build_graph_multiple_ports_same_pid() {
+        let listening = vec![
+            make_entry(3000, 1234, "node", None),
+            make_entry(3001, 1234, "node", None),
+        ];
+        let graph = build_port_graph(&listening);
+        assert_eq!(graph.nodes.len(), 2);
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn graph_nodes_have_unique_ports(entries in proptest::collection::vec(
+            (1u16..65535u16, 1u32..99999u32),
+            0..30,
+        )) {
+            let listening: Vec<ListeningEntry> = entries.iter()
+                .map(|(port, pid)| make_entry(*port, *pid, "test", None))
+                .collect();
+            let graph = build_port_graph(&listening);
+            let mut ports: Vec<u16> = graph.nodes.iter().map(|n| n.port).collect();
+            ports.sort();
+            ports.dedup();
+            assert_eq!(graph.nodes.len(), ports.len());
+        }
+    }
 }

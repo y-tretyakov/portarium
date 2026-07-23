@@ -156,6 +156,19 @@ fn print_graph_table(g: &PortGraph) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use portarium_core::models::{GraphEdge, GraphNode};
+
+    fn make_port(port: u16, pid: u32, name: &str) -> PortInfo {
+        PortInfo {
+            port,
+            pid,
+            process_name: name.into(),
+            project_path: None,
+            project_name: None,
+            protocol: "TCP".into(),
+            start_cmd: None,
+        }
+    }
 
     #[test]
     fn print_ports_table_does_not_panic() {
@@ -178,8 +191,32 @@ mod tests {
     }
 
     #[test]
+    fn print_ports_table_multiple_ports() {
+        let ports = vec![
+            make_port(3000, 1234, "node"),
+            make_port(8080, 5678, "python"),
+            make_port(5432, 9012, "postgres"),
+        ];
+        print_ports_table(&ports);
+    }
+
+    #[test]
     fn print_events_table_empty() {
         let events: Vec<&PortEvent> = vec![];
+        print_events_table(&events);
+    }
+
+    #[test]
+    fn print_events_table_with_events() {
+        let event = PortEvent {
+            port: 3000,
+            pid: 1234,
+            process_name: "node".into(),
+            framework: Some("React".into()),
+            event_type: EventType::Started,
+            timestamp: 1000,
+        };
+        let events = vec![&event];
         print_events_table(&events);
     }
 
@@ -193,8 +230,69 @@ mod tests {
     }
 
     #[test]
+    fn print_graph_table_with_nodes() {
+        let g = PortGraph {
+            nodes: vec![GraphNode {
+                id: "port:3000".into(),
+                port: 3000,
+                pid: 1234,
+                process_name: "node".into(),
+                project_name: Some("my-app".into()),
+                framework: Some("React".into()),
+                is_dev: true,
+                connection_count: 5,
+            }],
+            edges: vec![GraphEdge {
+                source: "port:3000".into(),
+                target: "port:5432".into(),
+                active: true,
+            }],
+        };
+        print_graph_table(&g);
+    }
+
+    #[test]
     fn print_traffic_table_empty() {
         let samples: Vec<TrafficSample> = vec![];
         print_traffic_table(3000, &samples);
+    }
+
+    #[test]
+    fn print_traffic_table_with_samples() {
+        let samples = vec![
+            TrafficSample {
+                connections: 5,
+                timestamp: 1000,
+            },
+            TrafficSample {
+                connections: 10,
+                timestamp: 2000,
+            },
+        ];
+        print_traffic_table(3000, &samples);
+    }
+
+    #[test]
+    fn print_ports_table_with_missing_project() {
+        let ports = vec![make_port(3000, 1234, "node")];
+        print_ports_table(&ports);
+    }
+
+    #[test]
+    fn print_graph_table_no_edges() {
+        let g = PortGraph {
+            nodes: vec![GraphNode {
+                id: "port:3000".into(),
+                port: 3000,
+                pid: 1234,
+                process_name: "node".into(),
+                project_name: None,
+                framework: None,
+                is_dev: false,
+                connection_count: 0,
+            }],
+            edges: vec![],
+        };
+        print_graph_table(&g);
     }
 }

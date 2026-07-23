@@ -6,6 +6,17 @@ public/
 .vscode/
 .agents/
 skills-lock.json
+docs/ADR-001-Core-Extraction.md
+docs/ADR-002-Ratatui-Migration.md
+docs/AGENTS.md
+docs/CODING_STANDARDS.md
+docs/DEVELOPMENT_FLOW.md
+docs/PLAN.md
+docs/PROMPT.md
+docs/STATUS.md
+docs/SUBAGENT_PROMPTS.md
+docs/portarium-analysis.md
+docs/tmp.md
 err.txt
 err2.txt
 err3.txt

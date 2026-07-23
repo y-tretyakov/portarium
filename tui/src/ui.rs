@@ -253,3 +253,40 @@ fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
 
     center
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::layout::Rect;
+
+    #[test]
+    fn centered_rect_returns_valid_rect() {
+        let area = Rect::new(0, 0, 100, 100);
+        let center = centered_rect(50, 50, area);
+        assert!(center.width <= 100);
+        assert!(center.height <= 100);
+    }
+
+    #[test]
+    fn centered_rect_full_size() {
+        let area = Rect::new(0, 0, 100, 100);
+        let center = centered_rect(100, 100, area);
+        assert_eq!(center, area);
+    }
+
+    #[test]
+    fn centered_rect_zero_size() {
+        let area = Rect::new(0, 0, 100, 100);
+        let center = centered_rect(0, 0, area);
+        assert_eq!(center.width, 0);
+        assert_eq!(center.height, 0);
+    }
+
+    #[test]
+    fn centered_rect_small_area() {
+        let area = Rect::new(0, 0, 10, 10);
+        let center = centered_rect(50, 50, area);
+        assert!(center.width <= 10);
+        assert!(center.height <= 10);
+    }
+}

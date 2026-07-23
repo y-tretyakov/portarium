@@ -165,6 +165,7 @@ impl PortLogger {
 mod tests {
     use super::*;
     use crate::config::LoggerConfig;
+    use proptest::strategy::Strategy;
 
     fn default_config() -> LoggerConfig {
         LoggerConfig {
@@ -286,5 +287,41 @@ mod tests {
 
         let events = logger.get_events();
         assert!(events.len() <= 5);
+    }
+
+    #[test]
+    fn logger_events_are_reversed() {
+        let config = default_config();
+        let mut logger = PortLogger::new(&config);
+
+        logger.update(&[(3000, 1, "a".into(), None)], &HashMap::new());
+        logger.update(
+            &[(3000, 1, "a".into(), None), (3001, 2, "b".into(), None)],
+            &HashMap::new(),
+        );
+
+        let events = logger.get_events();
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].port, 3001);
+        assert_eq!(events[1].port, 3000);
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn logger_handles_any_port_range(ports in proptest::collection::vec(
+            (0u16..65535u16, 1u32..99999u32, "[a-z]{1,10}".prop_map(String::from)),
+            0..20,
+        )) {
+            let config = default_config();
+            let mut logger = PortLogger::new(&config);
+            let port_refs: Vec<(u16, u32, String, Option<String>)> = ports.iter()
+                .map(|(p, pid, name)| (*p, *pid, name.clone(), None))
+                .collect();
+            let events = logger.update(&port_refs, &HashMap::new());
+            assert!(events.len() <= port_refs.len());
+            for e in &events {
+                assert_eq!(e.event_type, EventType::Started);
+            }
+        }
     }
 }
