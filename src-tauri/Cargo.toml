@@ -11,11 +11,11 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "image-png"] }
-tauri-plugin-opener = "2"
+tauri = { version = "2.11", features = ["tray-icon", "image-png"] }
+tauri-plugin-opener = "2.5"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 regex = "1.10"
-tauri-plugin-dialog = "2"
+tauri-plugin-dialog = "2.7"
 window-vibrancy = "0.5"
 portarium-core = { path = "../core" }
