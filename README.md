@@ -13,7 +13,6 @@ A blazing-fast, native developer port manager. Stop playing detective with `nets
 [![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/y-tretyakov/portarium/releases)
 [![Built with Tauri](https://img.shields.io/badge/Desktop-Tauri_2-FFC131?style=for-the-badge&logo=tauri&logoColor=white)](https://tauri.app)
 [![Terminal UI](https://img.shields.io/badge/Terminal-Ratatui-7c6fff?style=for-the-badge)](https://ratatui.rs)
-[![npm](https://img.shields.io/npm/v/portarium?style=for-the-badge&logo=npm&label=npm)](https://www.npmjs.com/package/portarium)
 [![Crates.io](https://img.shields.io/crates/v/portarium-core?style=for-the-badge&logo=rust&label=crates.io&cacheSeconds=0)](https://crates.io/crates/portarium-core)
 [![CI](https://img.shields.io/github/actions/workflow/status/y-tretyakov/portarium/ci.yml?style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/y-tretyakov/portarium/actions/workflows/ci.yml)
 [![Stars](https://img.shields.io/github/stars/y-tretyakov/portarium?style=social)](https://github.com/y-tretyakov/portarium)
@@ -326,38 +325,6 @@ RUST_LOG=debug cargo run -p portarium-tui
 | `3` | Graph screen (connection graph) |
 | `r` | Trigger manual scan |
 | `?` | Toggle help overlay |
-| `q` / `Ctrl+C` | Quit |
-
-#### JS TUI (`npx portarium` / `src-tui`)
-
-```bash
-# Via npm
-npx portarium
-
-# From source
-bun run src-tui/index.tsx
-
-# Or via the bin alias
-portarium
-```
-
-| Key | Action |
-|-----|--------|
-| `↑` / `↓` | Navigate port list |
-| `j` | Navigate down |
-| `k` | Kill selected process |
-| `K` | Kill all filtered processes |
-| `r` | Restart selected (if start_cmd known) |
-| `/` | Enter search mode |
-| `Esc` | Clear / exit search |
-| `f` | Cycle filter: all → dev → other |
-| `1` | Ports page |
-| `2` | Dashboard page |
-| `3` | Services page |
-| `4` | Logs page |
-| `Tab` | Cycle pages forward |
-| `Shift+Tab` | Cycle pages backward |
-| `u` | Force refresh |
 | `q` / `Ctrl+C` | Quit |
 
 #### Desktop App (Tauri)
