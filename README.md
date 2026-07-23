@@ -161,43 +161,61 @@ Portarium auto-detects these frameworks out-of-the-box:
 
 ### Spawning Test Services
 
-Quickly populate ports to exercise Portarium:
+#### Docker Compose (recommended)
+
+Start all Portarium-detectable ports with a single command:
 
 ```bash
-# Python — one-shot HTTP servers on popular ports
-python3 -m http.server 3000  --bind 127.0.0.1 &   # React dev port
-python3 -m http.server 4200  --bind 127.0.0.1 &   # Angular
-python3 -m http.server 5173  --bind 127.0.0.1 &   # Vite
-python3 -m http.server 8000  --bind 127.0.0.1 &   # Django
-python3 -m http.server 8080  --bind 127.0.0.1 &   # HTTP
-python3 -m http.server 5432  --bind 127.0.0.1 &   # Postgres (simulated)
-python3 -m http.server 6379  --bind 127.0.0.1 &   # Redis (simulated)
-python3 -m http.server 3306  --bind 127.0.0.1 &   # MySQL (simulated)
-python3 -m http.server 27017 --bind 127.0.0.1 &   # MongoDB (simulated)
-python3 -m http.server 9000  --bind 127.0.0.1 &   # PHP
-python3 -m http.server 1420  --bind 127.0.0.1 &   # Tauri
-python3 -m http.server 8888  --bind 127.0.0.1 &   # Jupyter
+# Start all test services (9 HTTP servers + Postgres + Redis + MySQL + Mongo)
+docker compose up -d
 
-# Node.js (if installed)
-npx serve -l 3000 &
-npx serve -l 4000 &
+# Verify everything is running
+docker compose ps
 
-# Netcat — lightweight listeners
-nc -lk 3000 &
-nc -lk 5000 &
-nc -lk 6000 &
+# Check logs
+docker compose logs -f
 
-# macOS — use any port with the built-in Python or:
+# Stop and clean up
+docker compose down
+```
+
+This spawns:
+- **9 HTTP servers** on ports 3000, 4000, 4200, 5173, 8000, 8080, 8888, 9000, 1420 — simulated dev frameworks
+- **Postgres** on 5432, **Redis** on 6379, **MySQL** on 3306, **MongoDB** on 27017 — real database services
+
+#### Python one-liners (no Docker)
+
+```bash
+# Start HTTP servers on popular dev ports
+for port in 3000 4000 4200 5173 8000 8080 8888 9000 1420; do
+  python3 -m http.server "$port" --bind 127.0.0.1 &
+done
+
+# Start simulated database listeners (just open the port, no real protocol)
+for port in 5432 6379 3306 27017; do
+  python3 -m http.server "$port" --bind 127.0.0.1 &
+done
+```
+
+#### Netcat / socat (lightweight)
+
+```bash
+# Start listeners on specific ports
+for port in 3000 5000 6000; do
+  nc -lk "$port" &
+done
+
+# macOS: socat variant
 socat TCP-LISTEN:3000,fork,reuseaddr EXEC:cat &
 ```
 
 ### Stopping Test Services
 
 ```bash
-# Kill by PID (find with Portarium or ps)
-kill -9 <PID>
+# Docker — stop everything
+docker compose down
 
-# Kill all test Python servers
+# Kill all Python HTTP servers
 pkill -f "python3 -m http.server"
 
 # Kill all netcat listeners

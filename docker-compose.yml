@@ -1,0 +1,53 @@
+name: portarium-diagnostics
+
+services:
+  # Simulated dev servers on all Portarium-detectable ports
+  test-server:
+    build: docker/test-server
+    ports:
+      - "3000:3000"
+      - "4000:4000"
+      - "4200:4200"
+      - "5173:5173"
+      - "8000:8000"
+      - "8080:8080"
+      - "8888:8888"
+      - "9000:9000"
+      - "1420:1420"
+
+  # Real database services for non-dev port detection
+  postgres:
+    image: postgres:17-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: portarium
+      POSTGRES_PASSWORD: portarium
+      POSTGRES_DB: portarium
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: portarium
+      MYSQL_DATABASE: portarium
+      MYSQL_USER: portarium
+      MYSQL_PASSWORD: portarium
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: portarium
+      MONGO_INITDB_ROOT_PASSWORD: portarium
+    restart: unless-stopped
