@@ -18,9 +18,9 @@ portarium/
 │       ├── graph/         # PortGraph — построение графа соединений
 │       ├── frameworks/    # FrameworkRegistry: TOML-расширяемый + builtin
 │       └── service.rs     # PortariumService — главный фасад (Result-based)
-├── tui/                   # Ratatui TUI [в разработке]
-├── src-tauri/             # Tauri Desktop (использует core) [ожидает]
-├── cli/                   # CLI [ожидает]
+├── tui/                   # Ratatui TUI [✅ готово]
+├── src-tauri/             # Tauri Desktop (использует core) [✅ готово]
+├── cli/                   # CLI [✅ готово]
 └── Cargo.toml             # workspace
 ```
 
@@ -48,6 +48,17 @@ portarium/
 | 0 — Инфраструктура | ✅ |
 | 1 — portarium-core | ✅ |
 | 3 — Tauri Desktop → core | ✅ |
-| 2 — portarium-tui (Ratatui) | ⬜ |
-| 4 — CLI | ⬜ |
+| 2 — portarium-tui (Ratatui) | ✅ базовая реализация |
+|   ├── Terminal setup (tui.rs) | ✅ |
+|   ├── Async event loop (main.rs) | ✅ |
+|   ├── UI rendering (Dashboard, Detail, Graph, Help) | ✅ |
+|   └── Background scan task | ✅ |
+| 4 — CLI | ✅ clap-based |
+|   ├── list (table/JSON) | ✅ |
+|   ├── watch (live polling) | ✅ |
+|   ├── events (filter by port) | ✅ |
+|   ├── graph (nodes+edges) | ✅ |
+|   ├── traffic (per port) | ✅ |
+|   ├── kill (by PID) | ✅ |
+|   └── restart (by PID+cmd+cwd) | ✅ |
 | 5 — Тесты и CI | ⬜ |

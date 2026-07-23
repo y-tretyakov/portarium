@@ -12,7 +12,7 @@ A blazing-fast, native developer port manager. Stop playing detective with `nets
 [![macOS](https://img.shields.io/badge/macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/y-tretyakov/portarium/releases)
 [![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/y-tretyakov/portarium/releases)
 [![Built with Tauri](https://img.shields.io/badge/Desktop-Tauri_2-FFC131?style=for-the-badge&logo=tauri&logoColor=white)](https://tauri.app)
-[![Terminal UI](https://img.shields.io/badge/Terminal-OpenTUI-7c6fff?style=for-the-badge)](https://github.com/anomalyco/opentui)
+[![Terminal UI](https://img.shields.io/badge/Terminal-Ratatui-7c6fff?style=for-the-badge)](https://ratatui.rs)
 [![npm](https://img.shields.io/npm/v/portarium?style=for-the-badge&logo=npm&label=npm)](https://www.npmjs.com/package/portarium)
 [![Stars](https://img.shields.io/github/stars/y-tretyakov/portarium?style=social)](https://github.com/y-tretyakov/portarium)
 
@@ -24,13 +24,11 @@ A blazing-fast, native developer port manager. Stop playing detective with `nets
 
 ## 🚀 Quick Start
 
-### Terminal UI (one-liner)
+### Terminal UI
 
 ```bash
-npx portarium
+cargo run -p portarium-tui
 ```
-
-Requires [Bun](https://bun.sh). Install it once: `curl -fsSL https://bun.sh/install | bash`
 
 ### Desktop App
 
@@ -83,9 +81,9 @@ Portarium lives quietly in your system tray:
 
 ---
 
-## 🖥️ Terminal UI (OpenTUI)
+## 🖥️ Terminal UI (Ratatui)
 
-Portarium ships with a full keyboard-driven terminal interface built on [OpenTUI](https://github.com/anomalyco/opentui). Same port dashboard, no desktop shell required — perfect for SSH sessions, minimal setups, or developers who live in the terminal.
+Portarium ships with a full keyboard-driven terminal interface built on [Ratatui](https://ratatui.rs). Same port dashboard, no desktop shell required — perfect for SSH sessions, minimal setups, or developers who live in the terminal.
 
 ### Four-Page Dashboard
 
@@ -114,18 +112,17 @@ Portarium ships with a full keyboard-driven terminal interface built on [OpenTUI
 
 ## 📥 Installation
 
-### Via npm (terminal-only)
+### Terminal UI (from source)
 
 ```bash
-# Run directly without installing
-npx portarium
-
-# Install globally
-npm install -g portarium
-portarium
+cargo run -p portarium-tui
 ```
 
-> The npm package provides the terminal UI only. Requires [Bun](https://bun.sh).
+### CLI
+
+```bash
+cargo run -p portarium-cli -- list
+```
 
 ### Desktop App
 
@@ -156,9 +153,7 @@ portarium
 
 | Tool | Version | Install |
 |------|---------|---------|
-| **Node.js** | ≥ 18 | [nodejs.org](https://nodejs.org) |
-| **Rust** | ≥ 1.70 | [rustup.rs](https://rustup.rs) |
-| **Bun** | ≥ 1.0 | [bun.sh](https://bun.sh) — required for TUI |
+| **Rust** | ≥ 1.75 | [rustup.rs](https://rustup.rs) |
 | **Tauri CLI** | v2 | Included |
 
 #### Desktop App
@@ -176,23 +171,16 @@ npm run tauri dev
 #### Terminal UI
 
 ```bash
-# Quick start (requires Bun)
-npx portarium
-
-# Install globally
-npm install -g portarium
-portarium
+cargo run -p portarium-tui
 ```
 
-Or from source:
+#### CLI
 
 ```bash
-# Requires Bun (https://bun.sh)
-bun install
-bun run tui
-
-# Development mode with auto-reload:
-bun run tui:dev
+cargo run -p portarium-cli -- list
+cargo run -p portarium-cli -- watch
+cargo run -p portarium-cli -- events
+cargo run -p portarium-cli -- graph
 ```
 
 ---
@@ -227,7 +215,7 @@ Portarium auto-detects these frameworks out-of-the-box:
 |-------|-----------|
 | **Runtime (desktop)** | [Tauri 2](https://tauri.app) — Rust backend, native webview |
 | **Frontend (desktop)** | React 19 + TypeScript + Vite 7 |
-| **Frontend (terminal)** | [OpenTUI](https://github.com/anomalyco/opentui) + React — `src-tui/` |
+| **Frontend (terminal)** | [Ratatui](https://ratatui.rs) — `tui/` |
 | **Visualization** | D3.js v7 — Force-directed graph simulation (desktop) |
 | **Styling** | Vanilla CSS — Custom Glassmorphism (desktop) |
 | **Port Engine** | `lsof`/`netstat` on Linux/macOS; `netstat` + `tasklist` on Windows |
@@ -263,6 +251,6 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 **If Portarium saved you from one more `EADDRINUSE`, give it a ⭐**
 
-Made with 🦀 Rust + ⚛️ React + ⬛ OpenTUI + 💜 by [y-tretyakov](https://github.com/y-tretyakov)
+Made with 🦀 Rust + ⚛️ React + ⬛ Ratatui + 💜 by [y-tretyakov](https://github.com/y-tretyakov)
 
 </div>

@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 portarium-core = { path = "../core" }
+clap = { version = "4", features = ["derive"] }
 color-eyre.workspace = true
 tokio.workspace = true
 serde.workspace = true
