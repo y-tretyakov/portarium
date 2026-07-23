@@ -14,7 +14,7 @@ A blazing-fast, native developer port manager. Stop playing detective with `nets
 [![Built with Tauri](https://img.shields.io/badge/Desktop-Tauri_2-FFC131?style=for-the-badge&logo=tauri&logoColor=white)](https://tauri.app)
 [![Terminal UI](https://img.shields.io/badge/Terminal-Ratatui-7c6fff?style=for-the-badge)](https://ratatui.rs)
 [![npm](https://img.shields.io/npm/v/portarium?style=for-the-badge&logo=npm&label=npm)](https://www.npmjs.com/package/portarium)
-[![Crates.io](https://img.shields.io/crates/v/portarium-core?style=for-the-badge&logo=rust&label=crates.io)](https://crates.io/crates/portarium-core)
+[![Crates.io](https://img.shields.io/crates/v/portarium-core?style=for-the-badge&logo=rust&label=crates.io&cacheSeconds=0)](https://crates.io/crates/portarium-core)
 [![CI](https://img.shields.io/github/actions/workflow/status/y-tretyakov/portarium/ci.yml?style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/y-tretyakov/portarium/actions/workflows/ci.yml)
 [![Stars](https://img.shields.io/github/stars/y-tretyakov/portarium?style=social)](https://github.com/y-tretyakov/portarium)
 
