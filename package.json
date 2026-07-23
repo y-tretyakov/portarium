@@ -18,7 +18,14 @@
     "type": "git",
     "url": "git+https://github.com/y-tretyakov/portarium.git"
   },
-  "keywords": ["port", "dashboard", "terminal", "tui", "developer-tools", "process-manager"],
+  "keywords": [
+    "port",
+    "dashboard",
+    "terminal",
+    "tui",
+    "developer-tools",
+    "process-manager"
+  ],
   "license": "MIT",
   "dependencies": {
     "@opentui/core": "^0.4.5",
