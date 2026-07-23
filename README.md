@@ -129,7 +129,21 @@ npm run tauri dev
 
 ### Pre-built Binaries
 
-Download from [GitHub Releases](https://github.com/y-tretyakov/portarium/releases).
+[GitHub Releases](https://github.com/y-tretyakov/portarium/releases) ship **CLI**, **TUI**, and **Desktop** builds for Linux, macOS, and Windows (including arm64 where available).
+
+| Artifact | Pattern |
+|----------|---------|
+| CLI / TUI | `portarium-cli-vX.Y.Z-<target-triple>.tar.gz` (`.zip` on Windows); same for `portarium-tui` |
+| Desktop | Platform installers (`.deb` / `.rpm` / `.AppImage`, `.dmg`, `.msi` / NSIS `.exe`) |
+| Source | `portarium-X.Y.Z-src.tar.gz` (+ `.zip`); verify with `SHA256SUMS.txt` |
+
+**Runtime dependencies**
+
+| Platform | Required tools |
+|----------|----------------|
+| **Linux** | `lsof`, `iproute2` (`ss`) |
+| **macOS** | `lsof` |
+| **Windows** | Built-in `netstat` / `taskkill` |
 
 ---
 

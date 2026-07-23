@@ -1,69 +1,356 @@
+# Production multi-platform release pipeline.
+# Trigger: push tags matching v*.*.* (e.g. v0.6.1)
+#
+# Job graph:
+#   prepare ──► cli-tui (matrix) ──┐
+#            └► desktop (matrix) ──┴► publish (single GH release)
+#
 name: Release
+
 on:
   push:
     tags: ["v*.*.*"]
 
+# Least privilege by default; publish elevates to contents: write.
 permissions:
-  contents: write
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  cli-tui:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+  # ── 1. Version gate + source archives ──────────────────────────────────────
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
 
-      - name: Build CLI
-        run: cargo build -p portarium-cli --release
+      - name: Extract version and verify against Cargo.toml
+        id: meta
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-].*)?$ ]]; then
+            echo "::error::Tag '${GITHUB_REF_NAME}' does not look like a semver version (expected vX.Y.Z)"
+            exit 1
+          fi
 
-      - name: Build TUI
-        run: cargo build -p portarium-tui --release
+          # Parse only [workspace.package] version (not nested/table noise)
+          CARGO_VERSION=$(sed -n '/^\[workspace\.package\]/,/^\[/{s/^version = "\(.*\)"/\1/p}' Cargo.toml | head -1)
+          if [[ -z "$CARGO_VERSION" ]]; then
+            echo "::error::Could not parse version from [workspace.package] in Cargo.toml"
+            exit 1
+          fi
+          if [[ "$VERSION" != "$CARGO_VERSION" ]]; then
+            echo "::error::Tag version '${VERSION}' does not match workspace.package.version '${CARGO_VERSION}'"
+            exit 1
+          fi
 
-      - name: Upload CLI + TUI binaries
-        uses: softprops/action-gh-release@v2
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Releasing portarium v${VERSION}"
+
+      - name: Create source archives
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p source
+          PREFIX="portarium-${VERSION}/"
+          git archive --format=tar.gz --prefix="${PREFIX}" -o "source/portarium-${VERSION}-src.tar.gz" HEAD
+          git archive --format=zip    --prefix="${PREFIX}" -o "source/portarium-${VERSION}-src.zip"    HEAD
+          (
+            cd source
+            sha256sum "portarium-${VERSION}-src.tar.gz" > "portarium-${VERSION}-src.tar.gz.sha256"
+            sha256sum "portarium-${VERSION}-src.zip"    > "portarium-${VERSION}-src.zip.sha256"
+          )
+          ls -la source/
+
+      - uses: actions/upload-artifact@v4
         with:
-          files: |
-            target/release/portarium-cli${{ matrix.os == 'windows-latest' && '.exe' || '' }}
-            target/release/portarium-tui${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+          name: source
+          path: source/*
+          if-no-files-found: error
+          retention-days: 14
 
-  desktop:
+  # ── 2. CLI + TUI multi-target archives ─────────────────────────────────────
+  # Pure Rust crates — native builds per triple (no cross-linker setup needed).
+  # Separate archives per binary avoid GH release asset name collisions.
+  cli-tui:
+    needs: prepare
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          # Linux x86_64 (glibc)
+          - runs-on: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            archive: tar.gz
+          # Linux aarch64 — GitHub-hosted ARM runner
+          - runs-on: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            archive: tar.gz
+          # macOS Apple Silicon (macos-latest is arm64)
+          - runs-on: macos-latest
+            target: aarch64-apple-darwin
+            archive: tar.gz
+          # macOS Intel — cross-compile from arm mac (SDK supports it; smoke skipped)
+          - runs-on: macos-latest
+            target: x86_64-apple-darwin
+            archive: tar.gz
+          # Windows MSVC
+          - runs-on: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive: zip
+    runs-on: ${{ matrix.runs-on }}
     steps:
       - uses: actions/checkout@v4
+
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: cli-tui-${{ matrix.target }}
+
+      - name: Build CLI + TUI
+        run: |
+          cargo build --release --locked \
+            -p portarium-cli -p portarium-tui \
+            --target ${{ matrix.target }}
+
+      - name: Package archives
+        shell: bash
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          TARGET: ${{ matrix.target }}
+          ARCHIVE: ${{ matrix.archive }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          BIN_DIR="target/${TARGET}/release"
+          EXE_SUFFIX=""
+          if [[ "$TARGET" == *windows* ]]; then
+            EXE_SUFFIX=".exe"
+          fi
+
+          package_bin() {
+            local name="$1"
+            local stage="staging-${name}"
+            rm -rf "$stage"
+            mkdir -p "$stage"
+            cp "${BIN_DIR}/${name}${EXE_SUFFIX}" "$stage/"
+            if [[ -f LICENSE ]]; then
+              cp LICENSE "$stage/"
+            fi
+
+            local archive_path="dist/${name}-v${VERSION}-${TARGET}.${ARCHIVE}"
+            if [[ "$ARCHIVE" == "zip" ]]; then
+              # bsdtar/GNU tar create zip when extension is .zip (-a auto-detect)
+              tar -a -cf "$archive_path" -C "$stage" .
+            else
+              tar -czf "$archive_path" -C "$stage" .
+            fi
+
+            if command -v sha256sum >/dev/null 2>&1; then
+              (cd dist && sha256sum "$(basename "$archive_path")") > "${archive_path}.sha256"
+            else
+              (cd dist && shasum -a 256 "$(basename "$archive_path")") > "${archive_path}.sha256"
+            fi
+            echo "Created ${archive_path}"
+          }
+
+          package_bin portarium-cli
+          package_bin portarium-tui
+          ls -la dist/
+
+      # TUI is interactive (no --help/-V); only smoke-test the clap CLI.
+      - name: Smoke test CLI (native targets only)
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          HOST=$(rustc -vV | sed -n 's/^host: //p')
+          if [[ "$HOST" != "$TARGET" ]]; then
+            echo "Skipping smoke test (non-native): host=${HOST} target=${TARGET}"
+            exit 0
+          fi
+          suffix=""
+          [[ "$TARGET" == *windows* ]] && suffix=".exe"
+          bin="target/${TARGET}/release/portarium-cli${suffix}"
+          echo "Smoke testing ${bin}"
+          "$bin" --help
+          "$bin" -V
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-tui-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  # ── 3. Desktop (Tauri) bundles ─────────────────────────────────────────────
+  # Build + upload-artifact only — do NOT create the GH release here (avoids
+  # softprops race when matrix legs run in parallel).
+  desktop:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x64 — ubuntu-22.04 for broader glibc compatibility vs latest
+          - runs-on: ubuntu-22.04
+            id: linux-x64
+          # Linux arm64 — GitHub-hosted ubuntu-24.04-arm (public label; glibc slightly newer than 22.04 x64 — acceptable tradeoff)
+          - runs-on: ubuntu-24.04-arm
+            id: linux-arm64
+          # macOS (dmg) — arm64 host
+          - runs-on: macos-latest
+            id: macos
+          # Windows (nsis + msi)
+          - runs-on: windows-latest
+            id: windows
+    runs-on: ${{ matrix.runs-on }}
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Install Linux system deps (Tauri)
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev \
+            patchelf \
+            libfuse2 \
+            rpm \
+            file
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: desktop-${{ matrix.id }}
+
       - name: Install JS deps
-        run: npm install
+        run: npm ci
 
       - name: Build Tauri desktop app
         run: npm run tauri build
 
-      - name: Upload desktop packages
+      - name: Collect desktop bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p desktop-dist
+          # Workspace builds may land in either path depending on cargo config
+          shopt -s nullglob
+          patterns=(
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm
+            src-tauri/target/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
+            target/release/bundle/deb/*.deb
+            target/release/bundle/rpm/*.rpm
+            target/release/bundle/appimage/*.AppImage
+            target/release/bundle/dmg/*.dmg
+            target/release/bundle/msi/*.msi
+            target/release/bundle/nsis/*.exe
+          )
+          count=0
+          for f in "${patterns[@]}"; do
+            cp -v "$f" desktop-dist/
+            count=$((count + 1))
+          done
+          if [[ "$count" -eq 0 ]]; then
+            echo "::error::No desktop bundles found under src-tauri/target or target"
+            echo "--- tree (bundle dirs) ---"
+            find src-tauri/target/release/bundle target/release/bundle -type f 2>/dev/null || true
+            exit 1
+          fi
+          # Per-file checksums via Python (portable across Linux/macOS/Windows runners)
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+          d = Path("desktop-dist")
+          for f in sorted(d.iterdir()):
+              if not f.is_file() or f.name.endswith(".sha256"):
+                  continue
+              digest = hashlib.sha256(f.read_bytes()).hexdigest()
+              (d / f"{f.name}.sha256").write_text(f"{digest}  {f.name}\n", encoding="utf-8")
+          PY
+          ls -la desktop-dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.id }}
+          path: desktop-dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  # ── 4. Single publish step (no race) ───────────────────────────────────────
+  # Matrices use fail-fast: false so partial platforms can still ship.
+  publish:
+    needs: [prepare, cli-tui, desktop]
+    if: ${{ always() && !cancelled() && needs.prepare.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
+      - name: Aggregate SHA256SUMS.txt
+        run: |
+          set -euo pipefail
+          cd release
+          echo "Artifacts present:"
+          ls -la
+
+          # Authoritative checksum list for every release asset (exclude checksum files)
+          : > SHA256SUMS.txt
+          find . -maxdepth 1 -type f \
+            ! -name 'SHA256SUMS.txt' \
+            ! -name '*.sha256' \
+            -printf '%f\n' | sort | while read -r f; do
+            sha256sum "$f" >> SHA256SUMS.txt
+          done
+
+          echo "=== SHA256SUMS.txt ==="
+          cat SHA256SUMS.txt
+
+          if [[ ! -s SHA256SUMS.txt ]]; then
+            echo "::error::No release files found to publish"
+            exit 1
+          fi
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            src-tauri/target/release/bundle/**/*.deb
-            src-tauri/target/release/bundle/**/*.AppImage
-            src-tauri/target/release/bundle/**/*.dmg
-            src-tauri/target/release/bundle/**/*.msi
-            src-tauri/target/release/bundle/**/*.exe
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          draft: false
+          generate_release_notes: true
+          # Flattened artifacts + aggregate checksums (single writer — no race)
+          files: release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

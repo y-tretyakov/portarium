@@ -17,7 +17,7 @@ tui:
 
 # Build CLI binary
 cli:
-    cargo build -p portarium
+    cargo build -p portarium-cli
 
 # Build Tauri desktop (requires npm deps)
 tauri:

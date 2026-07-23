@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- Multi-platform release pipeline (`release.yml`): CLI/TUI archives for Linux (x64 + arm64), macOS (arm64 + x64), Windows; Desktop bundles for Linux x64/arm64, macOS, Windows; single publish job with `SHA256SUMS.txt`
+- Desktop Linux arm64 runner: `ubuntu-24.04-arm` (GitHub-hosted public label)
+
 ## [0.6.0] — 2026-07-23 — Stage 2, 4, 5: TUI + CLI + Tests & CI
 
 ### Added (Stage 2 — portarium-tui Ratatui)
