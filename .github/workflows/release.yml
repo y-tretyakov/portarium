@@ -18,7 +18,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Build CLI
-        run: cargo build -p portarium --release
+        run: cargo build -p portarium-cli --release
 
       - name: Build TUI
         run: cargo build -p portarium-tui --release
@@ -27,6 +27,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            target/release/portarium${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+            target/release/portarium-cli${{ matrix.os == 'windows-latest' && '.exe' || '' }}
             target/release/portarium-tui${{ matrix.os == 'windows-latest' && '.exe' || '' }}
           generate_release_notes: true
