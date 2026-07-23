@@ -116,6 +116,7 @@ jobs:
           key: cli-tui-${{ matrix.target }}
 
       - name: Build CLI + TUI
+        shell: bash
         run: |
           cargo build --release --locked \
             -p portarium-cli -p portarium-tui \
@@ -232,7 +233,8 @@ jobs:
             patchelf \
             libfuse2 \
             rpm \
-            file
+            file \
+            xdg-utils
 
       - uses: actions/setup-node@v4
         with:
